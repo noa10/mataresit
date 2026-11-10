@@ -1,4 +1,6 @@
 -- Verify the restore backfills missing rows without overwriting saved settings.
+-- Sleep before the DO block: now() is fixed at transaction start inside it.
+SELECT pg_sleep(2.2);
 DO $$
 DECLARE
   scheduled_id uuid;
@@ -36,6 +38,51 @@ BEGIN
      NOT EXISTS (SELECT 1 FROM public.billing_email_schedule WHERE subscription_id = 'sub_batch') OR
      EXISTS (SELECT 1 FROM public.billing_email_schedule WHERE subscription_id = 'sub_disabled') THEN
     RAISE EXCEPTION 'batch scheduling did not respect backfilled and saved preferences: %', batch_result;
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'public.billing_email_schedule'::regclass
+      AND contype = 'c'
+      AND pg_get_expr(conbin, conrelid) ~* 'scheduled_for'
+      AND pg_get_expr(conbin, conrelid) ~* '(now[[:space:]]*\(|current_timestamp|transaction_timestamp[[:space:]]*\(|statement_timestamp[[:space:]]*\(|clock_timestamp[[:space:]]*\()'
+  ) THEN
+    RAISE EXCEPTION 'time-dependent billing schedule constraint survived the restore';
+  END IF;
+
+  IF NOT public.mark_billing_reminder_sent(
+    '25100000-0000-4000-8000-000000000013', false, 'smtp down'
+  ) THEN
+    RAISE EXCEPTION 'failed delivery was not recorded after the restore';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.billing_email_schedule
+    WHERE id = '25100000-0000-4000-8000-000000000013'
+      AND status = 'scheduled'::public.billing_email_status
+      AND delivery_attempts = 1
+      AND error_message = 'smtp down'
+  ) OR NOT EXISTS (
+    SELECT 1 FROM public.get_pending_billing_reminders()
+    WHERE schedule_id = '25100000-0000-4000-8000-000000000013'
+  ) THEN
+    RAISE EXCEPTION 'retryable delivery failure must stay scheduled after the restore';
+  END IF;
+  IF NOT public.mark_billing_reminder_sent(
+    '25100000-0000-4000-8000-000000000013', false, 'smtp down again'
+  ) THEN
+    RAISE EXCEPTION 'final failed delivery was not recorded after the restore';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.billing_email_schedule
+    WHERE id = '25100000-0000-4000-8000-000000000013'
+      AND status = 'failed'::public.billing_email_status
+      AND delivery_attempts = 2
+      AND failed_at IS NOT NULL
+  ) OR EXISTS (
+    SELECT 1 FROM public.get_pending_billing_reminders()
+    WHERE schedule_id = '25100000-0000-4000-8000-000000000013'
+  ) THEN
+    RAISE EXCEPTION 'exhausted delivery failure must become terminal after the restore';
   END IF;
 END $$;
 

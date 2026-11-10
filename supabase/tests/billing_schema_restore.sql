@@ -32,9 +32,12 @@ BEGIN
      (SELECT quiet_hours_end FROM public.get_my_billing_preferences()) IS DISTINCT FROM '06:45'::time THEN
     RAISE EXCEPTION 'authenticated user cannot read saved preferences and quiet hours';
   END IF;
+  IF (SELECT retry_interval_hours FROM public.get_billing_preferences('25100000-0000-4000-8000-000000000001')) IS DISTINCT FROM 12 THEN
+    RAISE EXCEPTION 'authenticated user cannot use the legacy self-scoped preferences RPC';
+  END IF;
   BEGIN
     PERFORM * FROM public.get_billing_preferences('25100000-0000-4000-8000-000000000002');
-    RAISE EXCEPTION 'authenticated user accessed the service-only preferences RPC';
+    RAISE EXCEPTION 'authenticated user accessed another user''s preferences';
   EXCEPTION WHEN insufficient_privilege THEN NULL;
   END;
   PERFORM set_config('request.jwt.claim.sub', '', true);
@@ -47,6 +50,9 @@ BEGIN
   IF (SELECT retry_interval_hours FROM public.get_my_billing_preferences()) IS DISTINCT FROM 24 OR
      (SELECT quiet_hours_start FROM public.get_my_billing_preferences()) IS NOT NULL THEN
     RAISE EXCEPTION 'missing own preferences must return defaults without exposing another user';
+  END IF;
+  IF (SELECT retry_interval_hours FROM public.get_billing_preferences('25100000-0000-4000-8000-000000000002')) IS DISTINCT FROM 24 THEN
+    RAISE EXCEPTION 'legacy RPC must return defaults for a user without a preferences row';
   END IF;
 END $$;
 RESET ROLE;
@@ -71,8 +77,8 @@ DECLARE
 BEGIN
   IF has_function_privilege('anon', 'public.get_my_billing_preferences()', 'EXECUTE')
      OR has_function_privilege('anon', 'public.get_billing_preferences(uuid)', 'EXECUTE')
-     OR has_function_privilege('authenticated', 'public.get_billing_preferences(uuid)', 'EXECUTE') THEN
-    RAISE EXCEPTION 'billing preferences RPC grants are too broad';
+     OR NOT has_function_privilege('authenticated', 'public.get_billing_preferences(uuid)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'billing preferences RPC grants are not scoped correctly';
   END IF;
   IF has_function_privilege('authenticated', 'public.get_pending_billing_reminders()', 'EXECUTE')
      OR has_function_privilege('authenticated', 'public.mark_billing_reminder_sent(uuid,boolean,text)', 'EXECUTE') THEN
@@ -111,6 +117,51 @@ BEGIN
   END IF;
   IF EXISTS (SELECT 1 FROM public.get_pending_billing_reminders() WHERE schedule_id = '25100000-0000-4000-8000-000000000003') THEN
     RAISE EXCEPTION 'sent reminder remains pending';
+  END IF;
+
+  -- Failure tracking must reach both branches without enum assignment errors.
+  UPDATE public.billing_email_schedule
+  SET status = 'scheduled'::public.billing_email_status,
+      delivery_attempts = 0,
+      max_delivery_attempts = 2,
+      failed_at = NULL,
+      error_message = NULL
+  WHERE id = '25100000-0000-4000-8000-000000000004';
+  IF NOT public.mark_billing_reminder_sent(
+    '25100000-0000-4000-8000-000000000004', false, 'smtp unavailable'
+  ) THEN
+    RAISE EXCEPTION 'failed delivery could not be recorded';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.billing_email_schedule
+    WHERE id = '25100000-0000-4000-8000-000000000004'
+      AND status = 'scheduled'::public.billing_email_status
+      AND delivery_attempts = 1
+      AND failed_at IS NULL
+      AND error_message = 'smtp unavailable'
+  ) OR NOT EXISTS (
+    SELECT 1 FROM public.get_pending_billing_reminders()
+    WHERE schedule_id = '25100000-0000-4000-8000-000000000004'
+  ) THEN
+    RAISE EXCEPTION 'retryable failure must remain scheduled with one attempt';
+  END IF;
+  IF NOT public.mark_billing_reminder_sent(
+    '25100000-0000-4000-8000-000000000004', false, 'smtp unavailable again'
+  ) THEN
+    RAISE EXCEPTION 'final failed delivery could not be recorded';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.billing_email_schedule
+    WHERE id = '25100000-0000-4000-8000-000000000004'
+      AND status = 'failed'::public.billing_email_status
+      AND delivery_attempts = 2
+      AND failed_at IS NOT NULL
+      AND error_message = 'smtp unavailable again'
+  ) OR EXISTS (
+    SELECT 1 FROM public.get_pending_billing_reminders()
+    WHERE schedule_id = '25100000-0000-4000-8000-000000000004'
+  ) THEN
+    RAISE EXCEPTION 'exhausted failure must be terminal and no longer pending';
   END IF;
   BEGIN
     INSERT INTO public.billing_email_schedule (user_id, reminder_type, scheduled_for)

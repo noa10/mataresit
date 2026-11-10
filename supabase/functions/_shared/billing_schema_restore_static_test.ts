@@ -70,3 +70,61 @@ Deno.test('the restore migration is applied before the pending hardening migrati
     );
   }
 });
+
+Deno.test('the restore migration keeps the legacy preferences path self-scoped and fixes failed reminders', async () => {
+  const migration = await Deno.readTextFile(restoreUrl);
+
+  for (
+    const expected of [
+      'CREATE OR REPLACE FUNCTION public.get_billing_preferences(p_user_id UUID)',
+      "auth.role() IS DISTINCT FROM 'service_role'",
+      'GRANT EXECUTE ON FUNCTION public.get_billing_preferences(UUID) TO authenticated, service_role;',
+      'CREATE OR REPLACE FUNCTION public.mark_billing_reminder_sent(',
+      "'failed'::public.billing_email_status",
+      "'scheduled'::public.billing_email_status",
+      "pg_get_expr(conbin, conrelid) ~* 'scheduled_for'",
+      'A time-dependent billing schedule constraint remains',
+    ] as const
+  ) {
+    if (!migration.includes(expected)) {
+      throw new Error(`The restore migration must contain: ${expected}`);
+    }
+  }
+
+  if (migration.includes("pg_get_expr(conbin, conrelid) = '(scheduled_for > now())'")) {
+    throw new Error('The restore migration must not match only the exact hosted constraint expression');
+  }
+});
+
+Deno.test('the drift fixture covers an equivalent constraint and failed delivery retries', async () => {
+  const setup = await Deno.readTextFile(
+    new URL('../../../.github/sql-regression/billing-drift-setup.sql', import.meta.url),
+  );
+  const verification = await Deno.readTextFile(
+    new URL('../../../.github/sql-regression/billing-drift-verification.sql', import.meta.url),
+  );
+
+  for (
+    const expected of [
+      'billing_email_schedule_due_time_custom',
+      '25100000-0000-4000-8000-000000000013',
+    ] as const
+  ) {
+    if (!setup.includes(expected)) {
+      throw new Error(`The drift fixture must contain: ${expected}`);
+    }
+  }
+
+  for (
+    const expected of [
+      'time-dependent billing schedule constraint survived the restore',
+      'failed delivery was not recorded after the restore',
+      'retryable delivery failure must stay scheduled after the restore',
+      'exhausted delivery failure must become terminal after the restore',
+    ] as const
+  ) {
+    if (!verification.includes(expected)) {
+      throw new Error(`The drift verification must contain: ${expected}`);
+    }
+  }
+});

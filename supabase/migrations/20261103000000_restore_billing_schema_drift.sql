@@ -454,7 +454,9 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Give the browser a self-scoped RPC without replacing the legacy service RPC.
+-- Give the browser a self-scoped RPC without removing the legacy read path.
+-- Deployed bundles still call get_billing_preferences({ p_user_id: user.id })
+-- and expect the original eleven columns.
 CREATE OR REPLACE FUNCTION public.get_my_billing_preferences()
 RETURNS TABLE (
   auto_renewal_enabled BOOLEAN,
@@ -496,20 +498,100 @@ BEGIN
 END;
 $$;
 
+-- Compatibility wrapper for the browser bundle that was already deployed when
+-- this migration ships. It preserves the original eleven-column contract,
+-- allows authenticated users to read only their own row, and keeps the
+-- service-role callers working. The new frontend uses the no-argument
+-- get_my_billing_preferences() above. A later migration can remove this alias
+-- after the cache window closes.
+CREATE OR REPLACE FUNCTION public.get_billing_preferences(p_user_id UUID)
+RETURNS TABLE (
+  auto_renewal_enabled BOOLEAN,
+  auto_renewal_frequency public.auto_renewal_frequency,
+  billing_email_enabled BOOLEAN,
+  reminder_days_before_renewal INTEGER[],
+  payment_failure_notifications BOOLEAN,
+  grace_period_notifications BOOLEAN,
+  max_payment_retry_attempts INTEGER,
+  retry_interval_hours INTEGER,
+  grace_period_days INTEGER,
+  preferred_language TEXT,
+  timezone TEXT
+) LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
+BEGIN
+  IF auth.role() IS DISTINCT FROM 'service_role'
+     AND (auth.uid() IS NULL OR auth.uid() IS DISTINCT FROM p_user_id) THEN
+    RAISE EXCEPTION 'Not authorized to read billing preferences' USING ERRCODE = '42501';
+  END IF;
+
+  RETURN QUERY
+  SELECT
+    COALESCE(bp.auto_renewal_enabled, true),
+    COALESCE(bp.auto_renewal_frequency, 'monthly'::public.auto_renewal_frequency),
+    COALESCE(bp.billing_email_enabled, true),
+    COALESCE(bp.reminder_days_before_renewal, '{7,3,1}'::INTEGER[]),
+    COALESCE(bp.payment_failure_notifications, true),
+    COALESCE(bp.grace_period_notifications, true),
+    COALESCE(bp.max_payment_retry_attempts, 3),
+    COALESCE(bp.retry_interval_hours, 24),
+    COALESCE(bp.grace_period_days, 7),
+    COALESCE(bp.preferred_language, 'en'),
+    COALESCE(bp.timezone, 'UTC')
+  FROM public.billing_preferences bp
+  WHERE bp.user_id = p_user_id;
+
+  IF NOT FOUND THEN
+    RETURN QUERY
+    SELECT
+      true,
+      'monthly'::public.auto_renewal_frequency,
+      true,
+      '{7,3,1}'::INTEGER[],
+      true,
+      true,
+      3,
+      24,
+      7,
+      'en',
+      'UTC';
+  END IF;
+END;
+$$;
+
 -- The old time-dependent CHECK prevents updates after a reminder becomes due.
--- Remove only that expression, preserving all unrelated schedule constraints.
+-- The hosted constraint name and expression may not match the checked-in one,
+-- so remove every CHECK on this table that references scheduled_for together
+-- with a time source, then fail closed if any such constraint survived.
+-- Verify the deployed pg_get_expr output with docs/runbooks/production-cutover.md
+-- before rollout; this migration deliberately preserves unrelated constraints.
 DO $$
 DECLARE
   constraint_name TEXT;
+  constraint_expression TEXT;
 BEGIN
-  FOR constraint_name IN
-    SELECT conname FROM pg_constraint
+  FOR constraint_name, constraint_expression IN
+    SELECT conname, pg_get_expr(conbin, conrelid)
+    FROM pg_constraint
     WHERE conrelid = 'public.billing_email_schedule'::regclass
       AND contype = 'c'
-      AND pg_get_expr(conbin, conrelid) = '(scheduled_for > now())'
+      AND pg_get_expr(conbin, conrelid) ~* 'scheduled_for'
+      AND pg_get_expr(conbin, conrelid) ~* '(now[[:space:]]*\(|current_timestamp|transaction_timestamp[[:space:]]*\(|statement_timestamp[[:space:]]*\(|clock_timestamp[[:space:]]*\()'
   LOOP
+    RAISE NOTICE 'Dropping time-dependent billing schedule constraint %: %',
+      constraint_name, constraint_expression;
     EXECUTE format('ALTER TABLE public.billing_email_schedule DROP CONSTRAINT %I', constraint_name);
   END LOOP;
+
+  IF EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'public.billing_email_schedule'::regclass
+      AND contype = 'c'
+      AND pg_get_expr(conbin, conrelid) ~* 'scheduled_for'
+      AND pg_get_expr(conbin, conrelid) ~* '(now[[:space:]]*\(|current_timestamp|transaction_timestamp[[:space:]]*\(|statement_timestamp[[:space:]]*\(|clock_timestamp[[:space:]]*\()'
+  ) THEN
+    RAISE EXCEPTION 'A time-dependent billing schedule constraint remains; inspect pg_constraint before continuing'
+      USING ERRCODE = '23514';
+  END IF;
 END $$;
 
 CREATE OR REPLACE FUNCTION public.validate_billing_reminder_schedule()
@@ -527,6 +609,77 @@ DROP TRIGGER IF EXISTS validate_billing_reminder_schedule_trigger ON public.bill
 CREATE TRIGGER validate_billing_reminder_schedule_trigger
   BEFORE INSERT OR UPDATE OF scheduled_for ON public.billing_email_schedule
   FOR EACH ROW EXECUTE FUNCTION public.validate_billing_reminder_schedule();
+
+-- The canonical function in 20250722000000 assigns an untyped CASE result to
+-- the billing_email_status enum. On hosted PostgreSQL that failure branch
+-- raises "column status is of type billing_email_status but expression is of
+-- type text", leaving failed reminders scheduled forever. Replace the
+-- function with explicit enum casts while preserving its audit event.
+CREATE OR REPLACE FUNCTION public.mark_billing_reminder_sent(
+  p_schedule_id UUID,
+  p_success BOOLEAN DEFAULT true,
+  p_error_message TEXT DEFAULT NULL
+) RETURNS BOOLEAN
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
+DECLARE
+  reminder_record RECORD;
+BEGIN
+  SELECT * INTO reminder_record
+  FROM public.billing_email_schedule
+  WHERE id = p_schedule_id;
+
+  IF NOT FOUND THEN
+    RETURN false;
+  END IF;
+
+  IF p_success THEN
+    UPDATE public.billing_email_schedule
+    SET
+      status = 'sent'::public.billing_email_status,
+      sent_at = now(),
+      delivery_attempts = delivery_attempts + 1,
+      updated_at = now()
+    WHERE id = p_schedule_id;
+  ELSE
+    UPDATE public.billing_email_schedule
+    SET
+      status = CASE
+        WHEN delivery_attempts + 1 >= max_delivery_attempts
+          THEN 'failed'::public.billing_email_status
+        ELSE 'scheduled'::public.billing_email_status
+      END,
+      failed_at = CASE
+        WHEN delivery_attempts + 1 >= max_delivery_attempts THEN now()
+        ELSE failed_at
+      END,
+      error_message = p_error_message,
+      delivery_attempts = delivery_attempts + 1,
+      updated_at = now()
+    WHERE id = p_schedule_id;
+  END IF;
+
+  PERFORM public.log_billing_event(
+    reminder_record.user_id,
+    CASE WHEN p_success THEN 'billing_reminder_sent' ELSE 'billing_reminder_failed' END,
+    'Billing reminder email ' || CASE WHEN p_success THEN 'sent successfully' ELSE 'failed to send' END,
+    NULL,
+    reminder_record.subscription_id,
+    NULL,
+    '{}',
+    jsonb_build_object(
+      'schedule_id', p_schedule_id,
+      'reminder_type', reminder_record.reminder_type,
+      'success', p_success,
+      'error_message', p_error_message,
+      'delivery_attempts', reminder_record.delivery_attempts + 1
+    ),
+    '{}',
+    'system'
+  );
+
+  RETURN true;
+END;
+$$;
 
 COMMENT ON FUNCTION public.process_auto_renewal IS 'Processes auto-renewal for a specific subscription';
 COMMENT ON FUNCTION public.handle_renewal_failure IS 'Handles subscription renewal failure and initiates grace period';
@@ -571,7 +724,9 @@ CREATE TRIGGER payment_retry_tracking_updated_at_trigger
   EXECUTE FUNCTION public.update_payment_retry_tracking_updated_at();
 
 -- ---------------------------------------------------------------------------
--- 3. Billing RPCs are service-role only, apart from self-scoped preferences.
+-- 3. Billing RPCs are service-role only, apart from the self-scoped
+--    preferences read paths (get_my_billing_preferences and the legacy
+--    get_billing_preferences compatibility wrapper).
 --
 -- This covers EVERY overload of each name, so the unversioned eight-argument
 -- renewal-tracking function loses its anon/authenticated execute grant even
@@ -627,5 +782,10 @@ END $$;
 
 REVOKE ALL ON FUNCTION public.get_my_billing_preferences() FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.get_my_billing_preferences() TO authenticated;
+
+-- Regrant the legacy read only after the service-role-only loop, otherwise
+-- deployed browser bundles would fail with 42501 during the frontend rollout.
+REVOKE ALL ON FUNCTION public.get_billing_preferences(UUID) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.get_billing_preferences(UUID) TO authenticated, service_role;
 
 COMMIT;
