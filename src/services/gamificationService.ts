@@ -51,7 +51,7 @@ const DEFAULT_TIMEZONE = "Asia/Kuala_Lumpur";
 const gamificationQueryKeys = {
   root: ["gamification"] as const,
   snapshot: (userId: string) => ["gamification", "snapshot", userId] as const,
-  leaderboard: (metric: LeaderboardMetric, countryCode: string | null = null) => ["gamification", "leaderboard", metric, countryCode ?? "global"] as const,
+  leaderboard: (userId: string | null, metric: LeaderboardMetric, countryCode: string | null = null) => ["gamification", "leaderboard", userId, metric, countryCode ?? "global"] as const,
   missions: (userId: string) => ["gamification", "missions", userId] as const,
   referral: (userId: string) => ["gamification", "referral", userId] as const,
   legacySurface: (userId: string) => ["gamification-surface", userId] as const,
