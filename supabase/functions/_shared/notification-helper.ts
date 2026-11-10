@@ -86,6 +86,17 @@ export class EdgeNotificationHelper {
   }
 
   /**
+   * Public preference lookup for diagnostic callers. Kept as a thin wrapper so
+   * the filtering rules stay in one place.
+   */
+  async checkNotificationPreferences(
+    userId: string,
+    notificationType: string
+  ): Promise<{ pushEnabled: boolean; emailEnabled: boolean; inAppEnabled: boolean }> {
+    return this.checkUserNotificationPreferences(userId, notificationType);
+  }
+
+  /**
    * Enhanced filtering logic for in-app notifications
    * This implements the same logic as the client-side shouldShowNotificationWithPreferences function
    */

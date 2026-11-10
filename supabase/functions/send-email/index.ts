@@ -1,5 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
+import { getServiceRoleKey } from '../_shared/service-role.ts';
+import { isPrivileged, resolveCaller } from '../_shared/function-auth.ts';
+import { authorizeUserEmail } from './authorization.ts';
 import {
   generateReceiptProcessingEmail,
   generateBatchProcessingEmail,
@@ -22,7 +25,7 @@ import {
 // Initialize Supabase client for database operations
 const supabaseClient = createClient(
   Deno.env.get('SUPABASE_URL') ?? '',
-  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+  getServiceRoleKey() ?? ''
 );
 
 const corsHeaders = {
@@ -51,6 +54,44 @@ serve(async (req) => {
       metadata,
       preview_mode = false
     } = requestBody;
+
+    const caller = await resolveCaller(req, supabaseClient);
+    if (!caller) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
+    if (!isPrivileged(caller)) {
+      const authorization = await authorizeUserEmail(caller, requestBody, supabaseClient);
+      if (!authorization.allowed) {
+        console.warn('Rejected send-email request:', {
+          callerRole: caller.role,
+          reason: authorization.reason
+        });
+        return new Response(
+          JSON.stringify({ error: 'Forbidden' }),
+          {
+            status: 403,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        );
+      }
+    }
+
+    if (typeof to !== 'string' || !to.trim() || /[\r\n]/.test(to)) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid recipient' }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
 
     // Generate email content from template if template_name and template_data are provided
     let emailSubject = subject;
@@ -120,6 +161,26 @@ serve(async (req) => {
             text: emailText,
             template_name,
             template_data
+          }
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
+    // A dry run measures the request path without creating a delivery record
+    // or calling the email provider. Callers opt in with metadata.dry_run.
+    if (metadata?.dry_run === true) {
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: 'Dry run: email not sent',
+          data: {
+            id: `dry_run_${Date.now()}`,
+            to: [to],
+            subject: emailSubject
           }
         }),
         {

@@ -104,60 +104,45 @@
                 log(`📝 Access token length: ${session.access_token.length}`, 'info');
                 log(`📝 Token preview: ${session.access_token.substring(0, 50)}...`, 'info');
                 
-                // Step 2: Test the token with test-auth-validation
-                log('2️⃣ Testing token with test-auth-validation Edge Function...', 'info');
-                
-                const response = await fetch(`${SUPABASE_URL}/functions/v1/test-auth-validation`, {
+                // Step 2: Validate the token with the Supabase Auth server
+                log('2️⃣ Validating token with Supabase Auth...', 'info');
+
+                const { data: { user }, error: userError } = await supabase.auth.getUser(session.access_token);
+
+                if (userError || !user) {
+                    log(`❌ Token validation failed: ${userError?.message ?? 'no user returned'}`, 'error');
+                    return;
+                }
+
+                log(`✅ Token validated for user: ${user.email}`, 'success');
+
+                // Step 3: Test with unified-search Edge Function
+                log('3️⃣ Testing token with unified-search Edge Function...', 'info');
+
+                const searchResponse = await fetch(`${SUPABASE_URL}/functions/v1/unified-search`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${session.access_token}`,
                         'apikey': SUPABASE_ANON_KEY,
                     },
-                    body: JSON.stringify({})
+                    body: JSON.stringify({
+                        query: 'test query',
+                        sources: ['receipt'],
+                        limit: 1
+                    })
                 });
-                
-                log(`📝 Response status: ${response.status}`, response.ok ? 'success' : 'error');
-                
-                const responseText = await response.text();
-                let responseData;
-                
+
+                log(`📝 Unified-search response status: ${searchResponse.status}`, searchResponse.ok ? 'success' : 'error');
+
+                const searchResponseText = await searchResponse.text();
                 try {
-                    responseData = JSON.parse(responseText);
-                    logPre(JSON.stringify(responseData, null, 2), response.ok ? 'success' : 'error');
+                    const searchData = JSON.parse(searchResponseText);
+                    logPre(JSON.stringify(searchData, null, 2), searchResponse.ok ? 'success' : 'error');
                 } catch (e) {
-                    log(`📝 Raw response: ${responseText}`, 'error');
+                    log(`📝 Unified-search raw response: ${searchResponseText}`, 'error');
                 }
-                
-                // Step 3: Test with unified-search Edge Function
-                if (response.ok && responseData?.success) {
-                    log('3️⃣ Testing token with unified-search Edge Function...', 'info');
-                    
-                    const searchResponse = await fetch(`${SUPABASE_URL}/functions/v1/unified-search`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${session.access_token}`,
-                            'apikey': SUPABASE_ANON_KEY,
-                        },
-                        body: JSON.stringify({
-                            query: 'test query',
-                            sources: ['receipt'],
-                            limit: 1
-                        })
-                    });
-                    
-                    log(`📝 Unified-search response status: ${searchResponse.status}`, searchResponse.ok ? 'success' : 'error');
-                    
-                    const searchResponseText = await searchResponse.text();
-                    try {
-                        const searchData = JSON.parse(searchResponseText);
-                        logPre(JSON.stringify(searchData, null, 2), searchResponse.ok ? 'success' : 'error');
-                    } catch (e) {
-                        log(`📝 Unified-search raw response: ${searchResponseText}`, 'error');
-                    }
-                }
-                
+
             } catch (error) {
                 log(`❌ Test error: ${error.message}`, 'error');
                 console.error('Test error:', error);

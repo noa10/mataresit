@@ -1,5 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { getServiceRoleKey } from '../_shared/service-role.ts';
+import { isPrivileged, resolveCaller } from '../_shared/function-auth.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -8,8 +10,14 @@ const corsHeaders = {
 
 const supabaseClient = createClient(
   Deno.env.get('SUPABASE_URL') ?? '',
-  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+  getServiceRoleKey() ?? ''
 );
+
+const jsonError = (status: number, error: string) =>
+  new Response(JSON.stringify({ error }), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
 
 interface BillingHealthMetrics {
   overall_health: 'healthy' | 'warning' | 'critical';
@@ -53,9 +61,25 @@ serve(async (req) => {
   }
 
   try {
-    const { action, timeframe = '24h', include_details = false } = await req.json();
+    const requestBody = await req.json();
+    const { action, timeframe = '24h', include_details = false } = requestBody;
 
-    console.log('Billing monitor request:', { action, timeframe, include_details });
+    const caller = await resolveCaller(req, supabaseClient);
+    if (!caller) {
+      return jsonError(401, 'Unauthorized');
+    }
+    // Billing metrics span every customer; only global admins and internal
+    // service callers may read them.
+    if (!isPrivileged(caller)) {
+      return jsonError(403, 'Forbidden');
+    }
+
+    console.log('Billing monitor request:', {
+      action,
+      timeframe,
+      include_details,
+      callerRole: caller.role,
+    });
 
     switch (action) {
       case 'get_health_metrics':
@@ -74,22 +98,16 @@ serve(async (req) => {
         return await getSystemAlerts();
       
       case 'acknowledge_alert':
-        return await acknowledgeAlert(await req.json());
-      
+        return await acknowledgeAlert(requestBody);
+
       case 'trigger_health_check':
         return await triggerHealthCheck();
-      
+
       case 'get_performance_metrics':
-        return await getPerformanceMetrics(timeframe);
-      
+        return await getHealthMetrics(timeframe, include_details);
+
       default:
-        return new Response(
-          JSON.stringify({ error: 'Unknown action' }),
-          {
-            status: 400,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          }
-        );
+        return jsonError(400, 'Unknown action');
     }
   } catch (error) {
     console.error('Billing monitor error:', error);
