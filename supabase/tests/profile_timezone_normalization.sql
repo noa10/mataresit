@@ -3,6 +3,11 @@
 \set ON_ERROR_STOP on
 BEGIN;
 
+-- The bare PostgreSQL CI fixture only creates columns needed by the migrations.
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS first_name text;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS last_name text;
+ALTER TABLE public.receipts DISABLE TRIGGER USER;
+
 INSERT INTO auth.users (id, email)
 VALUES ('a1000000-0000-4000-8000-000000000001', 'timezone-test@example.invalid')
 ON CONFLICT (id) DO NOTHING;
@@ -16,6 +21,9 @@ DECLARE
   v_timezone TEXT;
   v_date DATE;
   v_message TEXT;
+  v_probe TIMESTAMPTZ;
+  v_expected NUMERIC;
+  v_actual NUMERIC;
   v_user CONSTANT UUID := 'a1000000-0000-4000-8000-000000000001';
   v_reference CONSTANT TIMESTAMPTZ := '2026-01-01 18:00:00+00';
 BEGIN
@@ -65,6 +73,41 @@ BEGIN
   IF public.get_user_local_date(v_user, v_reference) IS DISTINCT FROM DATE '2026-01-01' THEN
     RAISE EXCEPTION 'legacy padded valid timezone must be trimmed';
   END IF;
+
+  -- Pick a boundary where Los Angeles and Kuala Lumpur disagree about whether
+  -- a receipt is in the current month, regardless of when this suite runs.
+  SELECT candidate INTO v_probe
+  FROM (
+    SELECT (date_trunc('month', timezone('America/Los_Angeles', now()))
+      + month_offset * interval '1 month' + hour_offset * interval '1 hour')
+      AT TIME ZONE 'America/Los_Angeles' AS candidate
+    FROM generate_series(0, 1) AS month_offset
+    CROSS JOIN generate_series(-1, 1, 2) AS hour_offset
+  ) boundaries
+  WHERE (date_trunc('month', timezone('America/Los_Angeles', candidate)) =
+         date_trunc('month', timezone('America/Los_Angeles', now())))
+    IS DISTINCT FROM
+        (date_trunc('month', timezone('Asia/Kuala_Lumpur', candidate)) =
+         date_trunc('month', timezone('Asia/Kuala_Lumpur', now())))
+  LIMIT 1;
+  IF v_probe IS NULL THEN
+    RAISE EXCEPTION 'could not construct a timezone month-boundary fixture';
+  END IF;
+
+  INSERT INTO public.user_gamification_stats (user_id, leaderboard_opt_in)
+  VALUES (v_user, true)
+  ON CONFLICT (user_id) DO UPDATE SET leaderboard_opt_in = true;
+  INSERT INTO public.receipts (user_id, merchant, date, total, processing_status, created_at)
+  VALUES (v_user, 'Timezone fixture', CURRENT_DATE, 1, 'complete', v_probe);
+  v_expected := CASE WHEN date_trunc('month', public.get_user_local_date(v_user, v_probe)::timestamp) =
+    date_trunc('month', public.get_user_local_date(v_user, now())::timestamp) THEN 1 ELSE 0 END;
+  SELECT metric_value INTO v_actual
+  FROM public.get_gamification_leaderboard('monthly_receipts', NULL, 100)
+  WHERE is_current_user;
+  IF NOT FOUND OR v_actual IS DISTINCT FROM v_expected THEN
+    RAISE EXCEPTION 'legacy padded timezone: local date expects % monthly receipts, leaderboard returned %', v_expected, v_actual;
+  END IF;
+
   UPDATE public.profiles SET timezone_preference = E' \t\n' WHERE id = v_user;
   IF public.get_user_local_date(v_user, v_reference) IS DISTINCT FROM DATE '2026-01-02' THEN
     RAISE EXCEPTION 'legacy blank timezone must use the default';
@@ -72,6 +115,10 @@ BEGIN
   UPDATE public.profiles SET timezone_preference = ' Not/AZone ' WHERE id = v_user;
   IF public.get_user_local_date(v_user, v_reference) IS DISTINCT FROM DATE '2026-01-02' THEN
     RAISE EXCEPTION 'legacy malformed timezone must use the default';
+  END IF;
+  UPDATE public.profiles SET timezone_preference = '+05:30' WHERE id = v_user;
+  IF public.get_user_local_date(v_user, v_reference) IS DISTINCT FROM DATE '2026-01-02' THEN
+    RAISE EXCEPTION 'legacy non-catalog timezone must use the leaderboard default';
   END IF;
   ALTER TABLE public.profiles ENABLE TRIGGER validate_profile_timezone;
 
