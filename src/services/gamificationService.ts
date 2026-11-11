@@ -51,7 +51,7 @@ const DEFAULT_TIMEZONE = "Asia/Kuala_Lumpur";
 const gamificationQueryKeys = {
   root: ["gamification"] as const,
   snapshot: (userId: string) => ["gamification", "snapshot", userId] as const,
-  leaderboard: (metric: LeaderboardMetric, countryCode: string | null = null) => ["gamification", "leaderboard", metric, countryCode ?? "global"] as const,
+  leaderboard: (userId: string | null, metric: LeaderboardMetric, countryCode: string | null = null) => ["gamification", "leaderboard", userId, metric, countryCode ?? "global"] as const,
   missions: (userId: string) => ["gamification", "missions", userId] as const,
   referral: (userId: string) => ["gamification", "referral", userId] as const,
   legacySurface: (userId: string) => ["gamification-surface", userId] as const,
@@ -70,7 +70,15 @@ const hasMissingArtifactError = (error: { code?: string; message?: string } | nu
   const content = `${error?.code ?? ""} ${error?.message ?? ""}`.toLowerCase();
   return content.includes("does not exist") || content.includes("not found") || content.includes("schema cache") || content.includes("could not find");
 };
-const todayStamp = (timeZone: string) => new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+const todayStamp = (timeZone: string) => {
+  const options: Intl.DateTimeFormatOptions = { year: "numeric", month: "2-digit", day: "2-digit" };
+  try {
+    return new Intl.DateTimeFormat("en-CA", { ...options, timeZone: timeZone.trim() }).format(new Date());
+  } catch (error) {
+    if (!(error instanceof RangeError)) throw error;
+    return new Intl.DateTimeFormat("en-CA", { ...options, timeZone: DEFAULT_TIMEZONE }).format(new Date());
+  }
+};
 const buildReferralLink = (referralCode: string | null) => {
   if (!referralCode) return null;
   const origin = getSiteUrl();

@@ -163,6 +163,30 @@ describe("gamificationService", () => {
     expect(snapshot.activeMissions[0].mission?.code).toBe("first_receipt_complete");
   });
 
+  it.each([
+    [" \tAmerica/Los_Angeles\n ", "2026-01-01"],
+    [" Not/AZone ", "2026-01-02"],
+    [" \t\n ", "2026-01-02"],
+  ])("resolves legacy timezone %j without breaking the snapshot", async (timezone, lastScanDate) => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-01-01T18:00:00Z"));
+    try {
+      rpcMock.mockImplementation(async (fn: string) => ({
+        data: fn === "ensure_user_gamification_stats" ? { last_scan_date: lastScanDate } : [],
+        error: null,
+      }));
+      fromMock.mockImplementation((table: string) => createBuilder({
+        data: table === "profiles" ? { timezone_preference: timezone } : [],
+        error: null,
+      }));
+
+      const snapshot = await gamificationService.getSnapshot("user-1");
+      expect(snapshot.profile.dailyGoalCompletedToday).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("persists preference updates to user_gamification_stats", async () => {
     const upsert = vi.fn().mockResolvedValue({ error: null });
     fromMock.mockReturnValue({ upsert });

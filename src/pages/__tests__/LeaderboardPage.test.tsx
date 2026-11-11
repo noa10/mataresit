@@ -8,7 +8,12 @@ import LeaderboardPage from "@/pages/LeaderboardPage";
 
 const mocks = vi.hoisted(() => ({
   useGamification: vi.fn(),
+  user: { id: "user-1" } as { id: string } | null,
   language: "en",
+}));
+
+vi.mock("@/contexts/AuthContext", () => ({
+  useAuth: () => ({ user: mocks.user }),
 }));
 
 vi.mock("@/contexts/GamificationContext", () => ({
@@ -128,13 +133,76 @@ function renderPage() {
 
   // Re-render against the same QueryClient so a snapshot change (e.g. the member
   // opting in) can be exercised without discarding the query cache.
-  return { ...view, rerenderPage: () => view.rerender(tree()) };
+  return { ...view, queryClient, rerenderPage: () => view.rerender(tree()) };
 }
 
 describe("LeaderboardPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.language = "en";
+    mocks.user = { id: "user-1" };
+  });
+
+  it("isolates personalized rows when accounts switch using the same query cache", async () => {
+    const firstEntry = {
+      rank: 1, userId: "user-1", displayName: "First viewer", isCurrentUser: true,
+      isAnonymous: true, metric: "weekly_xp", value: 100, gapToTopTen: 0,
+    };
+    const secondEntry = {
+      rank: 2, userId: "user-2", displayName: "Second viewer", isCurrentUser: true,
+      isAnonymous: true, metric: "weekly_xp", value: 90, gapToTopTen: 0,
+    };
+    let resolveSecond: (rows: typeof secondEntry[]) => void = () => {};
+    const secondResult = new Promise<typeof secondEntry[]>((resolve) => { resolveSecond = resolve; });
+    const getLeaderboard = vi.fn()
+      .mockResolvedValueOnce([firstEntry])
+      .mockReturnValueOnce(secondResult);
+    mocks.useGamification.mockReturnValue({
+      snapshot: { profile: { leaderboardOptIn: true } },
+      isLoading: false,
+      getLeaderboard,
+    });
+
+    const { rerenderPage, queryClient } = renderPage();
+    expect(await screen.findByText("You are #1")).toBeInTheDocument();
+    expect(screen.getByRole("row", { name: /First viewer You/ })).toBeInTheDocument();
+
+    mocks.user = { id: "user-2" };
+    rerenderPage();
+    await waitFor(() => expect(getLeaderboard).toHaveBeenCalledTimes(2));
+    expect(screen.queryByText("You are #1")).not.toBeInTheDocument();
+    expect(screen.queryByRole("row", { name: /First viewer/ })).not.toBeInTheDocument();
+    resolveSecond([secondEntry]);
+    expect(await screen.findByText("You are #2")).toBeInTheDocument();
+    expect(screen.getByRole("row", { name: /Second viewer You/ })).toBeInTheDocument();
+    expect(queryClient.getQueryData(["gamification", "leaderboard", "user-1", "weekly_xp", "global"]))
+      .toEqual([firstEntry]);
+    expect(queryClient.getQueryData(["gamification", "leaderboard", "user-2", "weekly_xp", "global"]))
+      .toEqual([secondEntry]);
+
+    mocks.user = { id: "user-1" };
+    rerenderPage();
+    expect(await screen.findByText("You are #1")).toBeInTheDocument();
+    expect(screen.queryByText("You are #2")).not.toBeInTheDocument();
+    expect(getLeaderboard).toHaveBeenCalledTimes(2);
+
+    mocks.user = null;
+    rerenderPage();
+    expect(screen.queryByText("You are #1")).not.toBeInTheDocument();
+    expect(getLeaderboard).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not fetch without a signed-in user even if the snapshot is opted in", () => {
+    mocks.user = null;
+    const getLeaderboard = vi.fn();
+    mocks.useGamification.mockReturnValue({
+      snapshot: { profile: { leaderboardOptIn: true } },
+      isLoading: false,
+      getLeaderboard,
+    });
+
+    renderPage();
+    expect(getLeaderboard).not.toHaveBeenCalled();
   });
 
   it("shows the privacy gate when leaderboard participation is disabled", async () => {

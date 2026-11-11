@@ -16,6 +16,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useAuth } from "@/contexts/AuthContext";
 import { useGamification } from "@/contexts/GamificationContext";
 import { useNavigationTranslation } from "@/contexts/LanguageContext";
 import { gamificationQueryKeys } from "@/services/gamificationService";
@@ -84,6 +85,7 @@ function LeaderboardSkeleton() {
 
 export default function LeaderboardPage() {
   const { t, language } = useNavigationTranslation();
+  const { user } = useAuth();
   const { snapshot, isLoading: isSnapshotLoading, getLeaderboard } = useGamification();
   const [selectedMetric, setSelectedMetric] = useState<LeaderboardMetric>("weekly_xp");
   const [countryCode, setCountryCode] = useState<string | null>(null);
@@ -92,14 +94,14 @@ export default function LeaderboardPage() {
   const optedIn = snapshot?.profile.leaderboardOptIn ?? false;
 
   const leaderboardQuery = useQuery({
-    queryKey: gamificationQueryKeys.leaderboard(selectedMetric, countryCode),
+    queryKey: gamificationQueryKeys.leaderboard(user?.id ?? null, selectedMetric, countryCode),
     queryFn: () => getLeaderboard(selectedMetric, { countryCode, limit: LEADERBOARD_LIMIT }),
     // The privacy gate renders when participation is off, so don't issue a
     // ranking request in that state. UI-level rule only: the
     // get_gamification_leaderboard RPC does not require the *caller* to have
     // opted in (it only lists members who did), so direct API callers are
     // unaffected — see the migration if this needs enforcing server-side.
-    enabled: !isSnapshotLoading && optedIn,
+    enabled: Boolean(user?.id) && !isSnapshotLoading && optedIn,
     staleTime: 60 * 1000,
     refetchOnWindowFocus: false,
   });

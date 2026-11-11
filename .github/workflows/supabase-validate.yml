@@ -449,6 +449,13 @@ jobs:
             )::uuid
           $$;
 
+          CREATE FUNCTION auth.role() RETURNS text LANGUAGE sql STABLE AS $$
+            SELECT COALESCE(
+              NULLIF(current_setting('request.jwt.claim.role', true), ''),
+              (NULLIF(current_setting('request.jwt.claims', true), '')::jsonb ->> 'role')
+            )
+          $$;
+
           CREATE FUNCTION public.update_updated_at_column()
           RETURNS trigger LANGUAGE plpgsql AS $$
           BEGIN
@@ -467,6 +474,7 @@ jobs:
             date date,
             total numeric(10,2),
             processing_status text,
+            is_business_expense boolean,
             created_at timestamptz NOT NULL DEFAULT now()
           );
 
@@ -488,9 +496,13 @@ jobs:
           psql -h localhost -U postgres -d leaderboard_test -v ON_ERROR_STOP=1 \
             -f supabase/migrations/20260310000000_add_gamification_schema_foundation.sql
           psql -h localhost -U postgres -d leaderboard_test -v ON_ERROR_STOP=1 \
+            -f supabase/migrations/20260310000001_add_gamification_reward_rules.sql
+          psql -h localhost -U postgres -d leaderboard_test -v ON_ERROR_STOP=1 \
             -f supabase/migrations/20260310110000_add_gamification_leaderboard_rpc.sql
           psql -h localhost -U postgres -d leaderboard_test -v ON_ERROR_STOP=1 \
             -f supabase/migrations/20261106010000_fix_gamification_leaderboard_rpc.sql
+          psql -h localhost -U postgres -d leaderboard_test -v ON_ERROR_STOP=1 \
+            -f supabase/migrations/20261110020000_fix_profile_timezone_normalization.sql
 
       - name: Assert leaderboard RPC behaviour
         env:
@@ -498,6 +510,8 @@ jobs:
         run: |
           psql -h localhost -U postgres -d leaderboard_test -v ON_ERROR_STOP=1 \
             -f supabase/tests/gamification_leaderboard_rpc.sql
+          psql -h localhost -U postgres -d leaderboard_test -v ON_ERROR_STOP=1 \
+            -f supabase/tests/profile_timezone_normalization.sql
 
   # Edge Functions Validation
   validate-edge-functions:
