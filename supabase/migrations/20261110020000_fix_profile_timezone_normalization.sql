@@ -47,10 +47,9 @@ BEGIN
     ON zone.name = NULLIF(pg_catalog.regexp_replace(p.timezone_preference, '^[[:space:]]+|[[:space:]]+$', '', 'g'), '')
   WHERE p.id = p_user_id;
 
-  -- Preserve the existing NULL result for a missing profile or reference time.
-  IF NOT FOUND OR p_reference_time IS NULL THEN
-    RETURN NULL;
-  END IF;
+  -- SELECT INTO sets its target to NULL when no profile row exists.
+  -- Keep gamification dates usable for accounts awaiting profile creation.
+  resolved_timezone := COALESCE(resolved_timezone, 'Asia/Kuala_Lumpur');
 
   BEGIN
     RETURN pg_catalog.timezone(resolved_timezone, p_reference_time)::DATE;

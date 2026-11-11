@@ -474,6 +474,7 @@ jobs:
             date date,
             total numeric(10,2),
             processing_status text,
+            is_business_expense boolean,
             created_at timestamptz NOT NULL DEFAULT now()
           );
 
@@ -494,6 +495,8 @@ jobs:
         run: |
           psql -h localhost -U postgres -d leaderboard_test -v ON_ERROR_STOP=1 \
             -f supabase/migrations/20260310000000_add_gamification_schema_foundation.sql
+          psql -h localhost -U postgres -d leaderboard_test -v ON_ERROR_STOP=1 \
+            -f supabase/migrations/20260310000001_add_gamification_reward_rules.sql
           psql -h localhost -U postgres -d leaderboard_test -v ON_ERROR_STOP=1 \
             -f supabase/migrations/20260310110000_add_gamification_leaderboard_rpc.sql
           psql -h localhost -U postgres -d leaderboard_test -v ON_ERROR_STOP=1 \

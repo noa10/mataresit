@@ -144,8 +144,47 @@ BEGIN
 
   PERFORM set_config('request.jwt.claim.role', 'service_role', true);
   PERFORM set_config('request.jwt.claims', '{"role":"service_role"}', true);
-  IF public.get_user_local_date('a1000000-0000-4000-8000-000000000002', v_reference) IS NOT NULL THEN
-    RAISE EXCEPTION 'missing profile must preserve the existing NULL result';
+  INSERT INTO auth.users (id, email)
+  VALUES ('a1000000-0000-4000-8000-000000000002', 'timezone-missing-profile@example.invalid')
+  ON CONFLICT (id) DO NOTHING;
+  DELETE FROM public.profiles WHERE id = 'a1000000-0000-4000-8000-000000000002';
+
+  PERFORM set_config('request.jwt.claim.sub', 'a1000000-0000-4000-8000-000000000002', true);
+  PERFORM set_config('request.jwt.claim.role', 'authenticated', true);
+  PERFORM set_config('request.jwt.claims', '{"sub":"a1000000-0000-4000-8000-000000000002","role":"authenticated"}', true);
+  PERFORM public.record_daily_login();
+  IF NOT EXISTS (
+    SELECT 1 FROM public.user_gamification_stats
+    WHERE user_id = 'a1000000-0000-4000-8000-000000000002'
+      AND last_login_date = timezone('Asia/Kuala_Lumpur', now())::DATE
+      AND login_streak_days = 1
+  ) THEN
+    RAISE EXCEPTION 'missing profile must still record the local login day and streak';
+  END IF;
+  IF public.get_user_local_date('a1000000-0000-4000-8000-000000000002', v_reference)
+     IS DISTINCT FROM DATE '2026-01-02' THEN
+    RAISE EXCEPTION 'missing profile must use the Kuala Lumpur default';
+  END IF;
+  IF public.get_user_local_date('a1000000-0000-4000-8000-000000000002', NULL) IS NOT NULL THEN
+    RAISE EXCEPTION 'NULL reference time must remain NULL for a missing profile';
+  END IF;
+  PERFORM public.record_daily_login();
+  IF (SELECT login_streak_days FROM public.user_gamification_stats
+      WHERE user_id = 'a1000000-0000-4000-8000-000000000002') IS DISTINCT FROM 1 THEN
+    RAISE EXCEPTION 'repeated login on the same local day must not increase the streak';
+  END IF;
+  UPDATE public.user_gamification_stats
+  SET last_login_date = timezone('Asia/Kuala_Lumpur', now())::DATE - 1,
+      login_streak_days = 2
+  WHERE user_id = 'a1000000-0000-4000-8000-000000000002';
+  PERFORM public.record_daily_login();
+  IF NOT EXISTS (
+    SELECT 1 FROM public.user_gamification_stats
+    WHERE user_id = 'a1000000-0000-4000-8000-000000000002'
+      AND last_login_date = timezone('Asia/Kuala_Lumpur', now())::DATE
+      AND login_streak_days = 3
+  ) THEN
+    RAISE EXCEPTION 'login after yesterday must extend the streak for a missing profile';
   END IF;
 END $$;
 
