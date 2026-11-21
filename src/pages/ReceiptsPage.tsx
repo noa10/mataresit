@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { EmptyState } from "@/components/ledger/EmptyState";
-import { Panel } from "@/components/ledger/Panel";
 import { ReceiptRow } from "@/components/ledger/ReceiptRow";
 import { ReceiptDetailSheet } from "@/components/receipts/ReceiptDetailSheet";
 import { ReceiptFiltersSheet } from "@/components/dashboard/ReceiptFiltersSheet";

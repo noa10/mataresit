@@ -45,7 +45,6 @@ export function ReceiptPicker({
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [dateFilter, setDateFilter] = useState<string>('all');
-  const [showUsedReceipts, setShowUsedReceipts] = useState(false);
   const { t, language } = useClaimsTranslation();
   const dateLocale = language === 'ms' ? 'ms-MY' : 'en-MY';
 

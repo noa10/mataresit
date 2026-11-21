@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { BRAND_NOTIFICATION_ICON } from '@/lib/brand-assets';
 import { PushNotificationService } from '@/services/pushNotificationService';
 import { notificationService } from '@/services/notificationService';

@@ -486,11 +486,9 @@ export default function Profile() {
 
       {/* Account & security — the former /profile/advanced security tab,
           embedded so profile has a single page. */}
-      {user && (
-        <div className="mt-3">
-          <AccountSettings userId={user.id} />
-        </div>
-      )}
+      <div className="mt-3">
+        <AccountSettings userId={user.id} />
+      </div>
 
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
         <DialogContent className="sm:max-w-[480px]">

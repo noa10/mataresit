@@ -1300,71 +1300,69 @@ export function useBatchFileUpload(options: BatchUploadOptions = {}) {
           throw new Error("Cancelled by user");
         }
 
-        console.log(`Processing result for ${newReceiptId}:`, result ? 'Success' : 'Failed');
+        console.log(`Processing result for ${newReceiptId}:`, 'Success');
 
         // If we got a successful result, update the status to completed
         // This is a fallback in case the realtime subscription doesn't catch the update
-        if (result) {
-          dispatch({
-            type: 'SET_UPLOAD_SUMMARY',
-            uploadId: upload.id,
-            summary: {
-              merchant: result.merchant || undefined,
-              date: result.date || undefined,
-              total: typeof result.total === 'number' ? result.total : undefined,
-              currency: result.currency || 'MYR',
-            },
-          });
+        dispatch({
+          type: 'SET_UPLOAD_SUMMARY',
+          uploadId: upload.id,
+          summary: {
+            merchant: result.merchant || undefined,
+            date: result.date || undefined,
+            total: typeof result.total === 'number' ? result.total : undefined,
+            currency: result.currency || 'MYR',
+          },
+        });
 
-          // Phase 3: Record successful API call for rate limiting
-          if (enableRateLimiting && batchSessionService && batchSession) {
-            const actualTokens = estimateTokensFromImageSize(upload.file.size);
-            const processingTime = Date.now() - (upload.processingStartedAt?.getTime() || Date.now());
+        // Phase 3: Record successful API call for rate limiting
+        if (enableRateLimiting && batchSessionService && batchSession) {
+          const actualTokens = estimateTokensFromImageSize(upload.file.size);
+          const processingTime = Date.now() - (upload.processingStartedAt?.getTime() || Date.now());
 
-            await batchSessionService.updateFileStatus({
-              fileId: upload.id,
-              status: 'completed',
-              receiptId: newReceiptId,
-              processingDurationMs: processingTime,
-              apiCallsMade: 1,
-              tokensUsed: actualTokens,
-              rateLimited: false
-            }, user.id);
-          }
-
-          // Phase 3: Update progress tracking for successful completion
-          if (progressTrackingService && batchSession) {
-            const processingTime = Date.now() - (upload.processingStartedAt?.getTime() || Date.now());
-            const actualTokens = estimateTokensFromImageSize(upload.file.size);
-
-            progressTrackingService.updateFileProgress(batchSession.id, upload.id, {
-              status: 'completed',
-              stage: 'completed',
-              progress: 100,
-              stageProgress: 100,
-              endTime: new Date(),
-              processingTimeMs: processingTime,
-              apiCalls: 1,
-              tokensUsed: actualTokens,
-              qualityScore: 0.95 // High quality score for successful processing
-            });
-          }
-
-          // Force update to completed status immediately
-          updateUploadStatus(upload.id, 'completed', 100);
-          statusChannel.unsubscribe();
-
-          // Also check after a short delay in case the first update didn't take effect
-          setTimeout(() => {
-            // Check if this upload is still in processing status
-            const currentUpload = batchUploads.find(u => u.id === upload.id);
-            if (currentUpload && currentUpload.status === 'processing') {
-              console.log(`Manually completing upload ${upload.id} after successful processing`);
-              updateUploadStatus(upload.id, 'completed', 100);
-              statusChannel.unsubscribe();
-            }
-          }, 2000);
+          await batchSessionService.updateFileStatus({
+            fileId: upload.id,
+            status: 'completed',
+            receiptId: newReceiptId,
+            processingDurationMs: processingTime,
+            apiCallsMade: 1,
+            tokensUsed: actualTokens,
+            rateLimited: false
+          }, user.id);
         }
+
+        // Phase 3: Update progress tracking for successful completion
+        if (progressTrackingService && batchSession) {
+          const processingTime = Date.now() - (upload.processingStartedAt?.getTime() || Date.now());
+          const actualTokens = estimateTokensFromImageSize(upload.file.size);
+
+          progressTrackingService.updateFileProgress(batchSession.id, upload.id, {
+            status: 'completed',
+            stage: 'completed',
+            progress: 100,
+            stageProgress: 100,
+            endTime: new Date(),
+            processingTimeMs: processingTime,
+            apiCalls: 1,
+            tokensUsed: actualTokens,
+            qualityScore: 0.95 // High quality score for successful processing
+          });
+        }
+
+        // Force update to completed status immediately
+        updateUploadStatus(upload.id, 'completed', 100);
+        statusChannel.unsubscribe();
+
+        // Also check after a short delay in case the first update didn't take effect
+        setTimeout(() => {
+          // Check if this upload is still in processing status
+          const currentUpload = batchUploads.find(u => u.id === upload.id);
+          if (currentUpload && currentUpload.status === 'processing') {
+            console.log(`Manually completing upload ${upload.id} after successful processing`);
+            updateUploadStatus(upload.id, 'completed', 100);
+            statusChannel.unsubscribe();
+          }
+        }, 2000);
       } catch (processError: any) {
         console.error("Processing error:", processError);
         addLocalLog(upload.id, 'ERROR', `Processing failed: ${processError.message || "Failed to process receipt"}`);

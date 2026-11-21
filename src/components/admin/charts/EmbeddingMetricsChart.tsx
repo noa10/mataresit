@@ -34,7 +34,7 @@ import {
   TrendingDown,
   Minus
 } from 'lucide-react';
-import { ChartConfig, ChartSeries, formatTooltipContent } from '@/utils/chartUtils';
+import { ChartConfig, formatTooltipContent } from '@/utils/chartUtils';
 import { useAdminTranslation } from '@/contexts/LanguageContext';
 
 interface EmbeddingMetricsChartProps {

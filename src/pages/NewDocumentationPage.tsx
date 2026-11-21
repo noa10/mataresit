@@ -17,8 +17,6 @@ import {
   type DocumentationStructure,
 } from "@/services/documentationService";
 
-const shell = "mx-auto w-full max-w-[1240px] px-5 min-[881px]:px-6";
-
 type DocFeature = { title: string; description: string };
 type DocStep = { title: string; description: string };
 type DocFaq = { question: string; answer: string };

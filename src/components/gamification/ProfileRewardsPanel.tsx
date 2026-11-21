@@ -21,7 +21,7 @@ const formatBadgeFallback = (code: string | null) =>
 export function ProfileRewardsPanel() {
   const { t } = useProfileTranslation();
   const { toast } = useToast();
-  const { snapshot, isLoading, updatePreferences } = useGamification();
+  const { snapshot, updatePreferences } = useGamification();
   const profile = snapshot?.profile;
   const referralSummary = snapshot?.referralSummary;
   const latestBadge = snapshot?.badges.find((badge) => Boolean(badge.unlockedAt));

@@ -107,6 +107,7 @@ export function LanguageProvider({ children }: LanguageProviderProps) {
 
   // Handle language change
   const handleLanguageChange = async (newLanguage: SupportedLanguage): Promise<boolean> => {
+    if (!isLanguageSupported(newLanguage)) return false;
     if (newLanguage === language) return true;
 
     try {

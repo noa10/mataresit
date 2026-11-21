@@ -100,7 +100,15 @@ export function useSearchChat() {
       const query = rawQuery.trim();
       if (!query || loadingRef.current) return;
 
-      const activeConversationId = conversationId ?? createSearchChatId();
+      let activeConversationId = conversationId;
+      if (!activeConversationId) {
+        try {
+          activeConversationId = createSearchChatId();
+        } catch {
+          toast.error(t('workspace.search.chat.error'));
+          return;
+        }
+      }
       if (!conversationId) {
         setConversationId(activeConversationId);
       }
