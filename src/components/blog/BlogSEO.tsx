@@ -59,7 +59,7 @@ export function BlogSEO({ post, isIndex = false, title, description }: BlogSEOPr
     const postDescription = post.excerpt || defaultDescription;
 
     // Build language-aware URL
-    const basePath = language === 'en' ? '/blog' : `/${language}/blog`;
+    const basePath = language === 'ms' ? '/ms/blog' : '/blog';
     const url = `${siteUrl}${basePath}/${post.slug}`;
     const image = post.image_url || defaultImage;
 

@@ -16,7 +16,6 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { 
   Clock, 
-  Zap, 
   TrendingUp, 
   TrendingDown, 
   AlertTriangle,

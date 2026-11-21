@@ -16,7 +16,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { useStripe } from "@/contexts/StripeContext";
 import { useSubscription } from "@/hooks/useSubscription";
 import { SUBSCRIPTION_TIERS } from "@/config/stripe";
-import type { SupportedLanguage } from "@/lib/i18n";
+import { isLanguageSupported } from "@/lib/i18n";
 import type { ThemeMode } from "@/contexts/ThemeContext";
 import { cn } from "@/lib/utils";
 
@@ -171,7 +171,7 @@ export default function SettingsPage() {
   };
 
   const handleLanguageChange = (value: string) => {
-    void changeLanguage(value as SupportedLanguage);
+    if (isLanguageSupported(value)) void changeLanguage(value);
   };
 
   const handleThemeChange = (value: string) => {

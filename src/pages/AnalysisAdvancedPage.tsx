@@ -414,7 +414,6 @@ const ExpenseChart: React.FC<ExpenseChartProps> = ({ dailyData, isLoading, dateR
   // Calculate statistics for annotations
   const totalExpenses = chartData.reduce((sum, day) => sum + day.amount, 0);
   const avgExpenses = totalExpenses / (chartData.length || 1);
-  const maxExpenses = Math.max(...chartData.map(d => d.amount), 0);
 
   // Custom tooltip to display more information
   const CustomTooltip = ({ active, payload, label }: any) => {

@@ -377,7 +377,7 @@ async function handleSubscriptionChange(
   });
 
   let status = resolveStripeStatusForDatabase(subscription.status);
-  let billingInterval = getSubscriptionBillingInterval(subscription);
+  const billingInterval = getSubscriptionBillingInterval(subscription);
 
   let previousTier: string | null = null;
   let previousStatus: string | null = null;
@@ -451,7 +451,6 @@ async function handleSubscriptionChange(
     );
     subscription = await stripe.subscriptions.retrieve(subscription.id);
     status = resolveStripeStatusForDatabase(subscription.status);
-    billingInterval = getSubscriptionBillingInterval(subscription);
     newTier = getSubscriptionTier(subscription, fallbackTier);
 
     syncedRows = await applyFencedStripeSubscriptionEvent(

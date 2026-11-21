@@ -2,6 +2,7 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useSearchChat } from '@/hooks/useSearchChat';
 import { listSearchChats } from '@/lib/search-chat/history';
+import { toast } from 'sonner';
 import type { UnifiedSearchResponse, UnifiedSearchResult } from '@/types/unified-search';
 
 const mocks = vi.hoisted(() => ({
@@ -81,6 +82,23 @@ describe('useSearchChat', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it('reports an error without starting a search when secure randomness is unavailable', async () => {
+    vi.stubGlobal('crypto', undefined);
+    const errorToast = vi.spyOn(toast, 'error').mockImplementation(() => 'error');
+    const { result: hook } = renderHook(() => useSearchChat());
+
+    await act(async () => {
+      await hook.current.sendMessage('coffee');
+    });
+
+    expect(errorToast).toHaveBeenCalledWith('I couldn’t complete that search.');
+    expect(mocks.unifiedSearch).not.toHaveBeenCalled();
+    expect(hook.current.conversationId).toBeNull();
+    expect(hook.current.messages).toEqual([]);
+    expect(hook.current.isLoading).toBe(false);
   });
 
   it('sends an enhanced conversational search and stores the answer', async () => {

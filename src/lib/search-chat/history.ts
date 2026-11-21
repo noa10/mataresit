@@ -89,7 +89,11 @@ const createId = (prefix: string): string => {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return `${prefix}${crypto.randomUUID()}`;
   }
-  return `${prefix}${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+  if (typeof crypto === 'undefined' || typeof crypto.getRandomValues !== 'function') {
+    throw new Error('Secure random number generation is unavailable');
+  }
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  return `${prefix}${Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('')}`;
 };
 
 const safeIso = (value: unknown, fallback: string): string => {

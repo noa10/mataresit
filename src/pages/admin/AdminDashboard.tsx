@@ -75,7 +75,7 @@ export default function AdminDashboard() {
                 disabled={loading}
                 className="flex items-center gap-2 px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
               >
-                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                <RefreshCw className="h-4 w-4" />
                 {t("dashboard.refresh")}
               </button>
             </div>

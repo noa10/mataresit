@@ -199,7 +199,7 @@ export function EmbeddingAggregationControls({
         <Badge variant="secondary" className="animate-pulse">
           <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
           {t(`embeddingMetrics.aggregation.typeNames.${isRunning}`, {
-            defaultValue: isRunning ?? '',
+            defaultValue: isRunning,
           })}
         </Badge>
       )}

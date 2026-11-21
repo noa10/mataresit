@@ -35,7 +35,6 @@ import {
   CheckCircle,
   Banknote,
   User,
-  FileText,
 } from 'lucide-react';
 
 const approvalSchema = z.object({

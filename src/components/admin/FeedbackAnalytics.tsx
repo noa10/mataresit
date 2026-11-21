@@ -193,7 +193,7 @@ export function FeedbackAnalytics() {
             onClick={loadAnalytics}
             disabled={isLoading}
           >
-            <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+            <RefreshCw className="h-4 w-4 mr-2" />
             {t('diagnostics.feedbackAnalytics.refresh')}
           </Button>
           

@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { useToast } from '@/hooks/use-toast';
 import { useTeam } from '@/contexts/TeamContext';
 import { claimService } from '@/services/claimService';
 import {
@@ -43,7 +42,6 @@ export default function ClaimDetailsPage() {
   const { claimId } = useParams<{ claimId: string }>();
   const navigate = useNavigate();
   const { currentTeam, hasPermission } = useTeam();
-  const { toast } = useToast();
   const { t, language } = useClaimsTranslation();
   const dateLocale = language === 'ms' ? 'ms-MY' : 'en-MY';
 

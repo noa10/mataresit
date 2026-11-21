@@ -99,7 +99,7 @@ export const fetchExpensesByCategory = async (startDateISO?: string | null, endD
         custom_categories (
           name
         )
-      `)
+      `);
 
     if (startDateISO) {
       query = query.gte('date', startDateISO); // Use ISO string here too
