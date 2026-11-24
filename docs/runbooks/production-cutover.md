@@ -110,7 +110,7 @@ If the push stops on `20261104000001` because the Vault secret is missing,
 create the secret (step 2) and rerun the same push. Migrations already applied
 in the first attempt are skipped.
 
-## 4. Batch dispatch configuration (inert in the current architecture)
+## 4. Batch dispatch configuration (legacy path, currently unattached)
 
 `20261104000001` creates `batch_item_dispatch_config` empty and replaces
 `handle_new_batch_item()`, but it **does not create a trigger**. No
@@ -119,15 +119,21 @@ repository, and hosted has no non-internal trigger invoking it. The current
 batch upload path does not use this function: it writes
 `batch_upload_sessions` / `batch_upload_files`
 (`20250720000003_batch_upload_optimization.sql`) and posts each file to
-`process-receipt` (`src/services/receiptService.ts:1940`). There is no
-`process-batch-item` Edge Function in `supabase/functions/`, and no repo
-migration creates `batches` or `batch_items`.
+`process-receipt` (`src/services/receiptService.ts:1940`). No repo migration
+creates `batches` or `batch_items`.
+
+Hosted does still carry a legacy `process-batch-item` Edge Function
+(`verify_jwt: false`, version 77, last updated 2025-04-16) that is **not tracked
+in this repository** and whose deployed source cannot be retrieved because its
+deployment metadata is missing. Do not redeploy or delete it during this
+cutover, and do not treat it as live: nothing in the repository or hosted
+database invokes it, so it receives no traffic from the current upload path.
 
 Consequently the empty config table does **not** block existing batch uploads,
-and leaving it empty is safe. Do not point it at a hostname until a
-`process-batch-item` function actually exists and a trigger is deliberately
-attached; an asynchronous `net.http_post` enqueue is not proof of delivery. If
-the legacy trigger is ever reattached, inserts fail closed with
+and leaving it empty is safe. Do not point it at a hostname until a trigger is
+deliberately attached and the legacy function is reviewed; an asynchronous
+`net.http_post` enqueue is not proof of delivery. If the legacy trigger is ever
+reattached, inserts fail closed with
 `Missing administrator-configured batch item endpoint` until this row is set
 (the table is owned by `postgres` and is not accessible to application roles):
 

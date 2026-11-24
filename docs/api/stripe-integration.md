@@ -99,8 +99,8 @@ first, then these hardening migrations in order:
   trigger**; no trigger in this repository or on hosted invokes the function,
   and the current batch upload path (`batch_upload_sessions` /
   `batch_upload_files` plus `process-receipt`) does not use it. Leave the table
-  empty unless a trigger is deliberately attached and a `process-batch-item`
-  Edge Function exists. The table is owned by postgres, has RLS enabled, and
+  empty unless a trigger is deliberately attached and the legacy
+  `process-batch-item` function is reviewed. The table is owned by postgres, has RLS enabled, and
   grants no privileges to PUBLIC, anon, authenticated, or service_role. Once a
   trigger is attached, batch-item inserts fail closed until the URL is
   configured. The migration does not validate the endpoint before applying.

@@ -191,10 +191,12 @@ the migration; the Edge Functions call RPCs and columns it creates.
       dashboard mutations in parallel with a user's own plan change — on those
       unfenced paths the last write wins.
 - [ ] Leave `batch_item_dispatch_config` empty unless a trigger is deliberately
-      attached and a `process-batch-item` Edge Function exists. The migration
-      creates the table empty; because nothing invokes
+      attached and the legacy `process-batch-item` Edge Function is reviewed.
+      The migration creates the table empty; because nothing invokes
       `handle_new_batch_item`, the empty table does not gate current batch
-      uploads. If the legacy trigger is reattached, have a trusted database
+      uploads. Hosted carries an untracked, legacy `process-batch-item`
+      function whose deployment metadata is missing; do not redeploy or delete
+      it during the cutover. If the legacy trigger is reattached, have a trusted database
       administrator configure the current environment's HTTPS endpoint. Verify
       the hostname belongs to that environment before executing the following
       example; never use the production hostname in a nonproduction environment:
