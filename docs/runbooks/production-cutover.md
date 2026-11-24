@@ -17,11 +17,12 @@ database access.
   targets the linked project by default; `--remote` only selects another one.
 
 > **`--include-all` is required.** The remote database already has
-> `20261106010000` (the gamification leaderboard fix from #235), while the three
-> billing migrations are older and still pending. `supabase db push` refuses
-> this out-of-order set with a `missing-remote` error unless `--include-all` is
-> passed. The flag only adds local migrations missing from the remote history;
-> it does not re-apply anything already recorded there.
+> `20261106010000` (the gamification leaderboard fix from #235), while the
+> billing restore and the billing/fencing migrations are older and still
+> pending. `supabase db push` refuses this out-of-order set with a
+> `missing-remote` error unless `--include-all` is passed. The flag only adds
+> local migrations missing from the remote history; it does not re-apply
+> anything already recorded there.
 
 > **Current live state.** The deployed frontend already selects
 > `profiles.cancel_at_period_end`/`billing_interval` and calls
@@ -38,16 +39,24 @@ supabase link --project-ref mpmkbtsufihzdelrlszs
 supabase migration list --remote
 ```
 
-`migration list` must show exactly these three as pending and nothing else:
+`migration list` must show the billing restore plus every later billing/fencing
+migration that the remote lacks. As of this branch, the migrations this runbook
+depends on are:
 
 ```
+20261103000000  restore_billing_schema_drift
 20261104000000  stripe_production_hardening
 20261104000001  batch_item_vault_trigger
 20261106000000  stripe_checkout_locks_and_payment_fencing
+20261110010000  stripe_fencing_regressions
+20261110020000  fix_profile_timezone_normalization
 ```
 
-The remote head will still be `20261106010000`; that is expected. If any other
-migration is pending, or the local/remote history disagrees, stop.
+The remote may also lack `20261109000000` and `20261110000000` (index-only
+migrations); those are safe to apply with the chain. `20261106010000` (the
+gamification leaderboard fix from #235) is already applied remotely and must not
+reappear as pending. If a migration outside this billing/fencing/index set is
+pending, or the local/remote history disagrees, stop.
 
 Dry run:
 
@@ -55,55 +64,91 @@ Dry run:
 supabase db push --remote --dry-run --include-all
 ```
 
-Confirm the dry run lists exactly the three migrations above. Do not run
+Confirm the dry run lists exactly the pending migrations above. Do not run
 `supabase db reset --remote` under any circumstance.
 
 ## 2. Vault secret — before the migrations
 
 Dashboard → Database → Vault → **New secret**:
 
-- name: `service_role_key`
+- name: `service_role_key` (lowercase — Vault secret names are case-sensitive)
 - value: the production service-role key from Project Settings → API
 
 There must be exactly one row with that name. Never put the value in a file, a
 migration, or chat.
 
-This step **must** happen before step 3:
-`20261104000001_batch_item_vault_trigger.sql` raises
-`Expected exactly one service_role_key Vault secret` and aborts the migration
-when the secret is absent.
+**Known hosted mismatch.** Hosted currently has a single uppercase
+`SERVICE_ROLE_KEY` Vault secret and no lowercase `service_role_key`.
+`20261104000001_batch_item_vault_trigger.sql:48` counts only the lowercase name,
+so it raises `Expected exactly one service_role_key Vault secret` and aborts the
+push even though a service-role key is present. Create the lowercase secret
+(same value) before step 3, or rename the uppercase one if nothing else reads
+it. The migration is forward-only and cannot be fixed by a later migration
+because it aborts first.
 
-Verify:
+This step **must** happen before step 3. Verify both the lowercase requirement
+and the uppercase duplicate:
 
 ```sql
-select count(*) from vault.decrypted_secrets where name = 'service_role_key'; -- 1
+select name, count(*)
+from vault.decrypted_secrets
+where name in ('service_role_key', 'SERVICE_ROLE_KEY')
+group by name
+order by name;
+-- service_role_key | 1   (required)
+-- SERVICE_ROLE_KEY | 1   (may remain; it does not satisfy the migration)
 ```
 
 ## 3. Apply
 
 ```bash
 supabase db push --remote --include-all --yes
-supabase migration list --remote   # all three now applied
+supabase migration list --remote   # every pending migration now applied
 ```
 
 If the push stops on `20261104000001` because the Vault secret is missing,
 create the secret (step 2) and rerun the same push. Migrations already applied
 in the first attempt are skipped.
 
-## 4. Batch dispatch configuration
+## 4. Batch dispatch configuration (inert in the current architecture)
 
-`handle_new_batch_item()` raises until `batch_item_dispatch_config` has one
-row. Insert it **before batch uploads resume** (Dashboard SQL editor; the table
-is owned by `postgres` and is not accessible to application roles):
+`20261104000001` creates `batch_item_dispatch_config` empty and replaces
+`handle_new_batch_item()`, but it **does not create a trigger**. No
+`CREATE TRIGGER` referencing `handle_new_batch_item` exists anywhere in this
+repository, and hosted has no non-internal trigger invoking it. The current
+batch upload path does not use this function: it writes
+`batch_upload_sessions` / `batch_upload_files`
+(`20250720000003_batch_upload_optimization.sql`) and posts each file to
+`process-receipt` (`src/services/receiptService.ts:1940`). There is no
+`process-batch-item` Edge Function in `supabase/functions/`, and no repo
+migration creates `batches` or `batch_items`.
+
+Consequently the empty config table does **not** block existing batch uploads,
+and leaving it empty is safe. Do not point it at a hostname until a
+`process-batch-item` function actually exists and a trigger is deliberately
+attached; an asynchronous `net.http_post` enqueue is not proof of delivery. If
+the legacy trigger is ever reattached, inserts fail closed with
+`Missing administrator-configured batch item endpoint` until this row is set
+(the table is owned by `postgres` and is not accessible to application roles):
 
 ```sql
+-- only when a trigger is deliberately attached and the endpoint exists
 INSERT INTO public.batch_item_dispatch_config (singleton, endpoint_url)
-VALUES (true, 'https://mpmkbtsufihzdelrlszs.supabase.co/functions/v1/process-batch-item')
+VALUES (true, 'https://<environment-ref>.supabase.co/functions/v1/process-batch-item')
 ON CONFLICT (singleton) DO UPDATE SET endpoint_url = EXCLUDED.endpoint_url;
 ```
 
-An asynchronous `net.http_post` enqueue is not proof of delivery; confirm a
-batch item reaches `process-batch-item` after the maintenance window.
+Verify the current (unattached) state:
+
+```sql
+select n.nspname as schema, c.relname as table_name, t.tgname
+from pg_trigger t
+join pg_class c on c.oid = t.tgrelid
+join pg_namespace n on n.oid = c.relnamespace
+join pg_proc p on p.oid = t.tgfoid
+where not t.tgisinternal and p.proname = 'handle_new_batch_item';
+-- expected: zero rows
+```
 
 ## 5. Verification
 
@@ -117,12 +162,12 @@ select column_name from information_schema.columns
 select to_regclass('public.stripe_checkout_locks'),
        to_regclass('public.stripe_webhook_events'),
        to_regclass('public.stripe_subscription_event_order');
-select endpoint_url from public.batch_item_dispatch_config; -- one row
+select endpoint_url from public.batch_item_dispatch_config; -- zero rows expected; see step 4
 ```
 
-Confirm the `handle_new_batch_item` trigger is attached to `batch_item_dispatch`
-as expected in this environment (the migration replaces the function, not the
-trigger).
+Confirm no trigger is attached (the query in step 4 must return zero rows).
+`batch_item_dispatch` is not a table in this project; the only table is
+`batch_item_dispatch_config`, and it is deliberately empty after the migration.
 
 Smoke test with a test-mode event (never a live charge): send one
 `customer.subscription.updated` event to the deployed `stripe-webhook` and

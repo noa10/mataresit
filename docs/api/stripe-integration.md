@@ -64,10 +64,13 @@ supabase secrets set \
   STRIPE_MAX_ANNUAL_PRICE_ID=price_...
 ```
 
-The `handle_new_batch_item()` database trigger reads the service-role key from
-Supabase Vault. Create a Vault secret named `service_role_key` in
-**Dashboard → Database → Vault**. Do not put the key in a migration, a tracked
-file, or the frontend environment.
+The `handle_new_batch_item()` trigger function reads the service-role key from
+Supabase Vault. No trigger currently attaches it (see the migration note below).
+Create a Vault secret named `service_role_key` (lowercase — Vault names are
+case-sensitive) in **Dashboard → Database → Vault**. Hosted currently has an
+uppercase `SERVICE_ROLE_KEY` secret; it does not satisfy the migration's
+lowercase lookup, so create the lowercase one before applying the migration. Do
+not put the key in a migration, a tracked file, or the frontend environment.
 
 Billing Edge Functions use the injected `SUPABASE_SERVICE_ROLE_KEY`. Do not
 replace it with a new-format `sb_secret_...` key: these functions pin
@@ -80,7 +83,8 @@ rejects a non-JWT bearer when JWT verification is enabled. Migrating to
 
 ### 3. Database Migration
 
-Three migrations must be applied, in order:
+Apply the billing restore (`20261103000000_restore_billing_schema_drift.sql`)
+first, then these hardening migrations in order:
 
 - `supabase/migrations/20261104000000_stripe_production_hardening.sql` — adds
   `billing_interval` / `cancel_at_period_end`, guards billing columns on INSERT
@@ -90,14 +94,16 @@ Three migrations must be applied, in order:
   exist, rather than deleting rows.
 - `supabase/migrations/20261104000001_batch_item_vault_trigger.sql` — moves
   `handle_new_batch_item()` off the hardcoded credential onto Vault. It requires
-  exactly one `service_role_key` Vault entry. After migration, a trusted database
-  administrator must insert or update the singleton row in
-  `public.batch_item_dispatch_config`, setting `endpoint_url` to the environment's
-  HTTPS URL ending in `/functions/v1/process-batch-item`. The table is owned by
-  postgres, has RLS enabled, and grants no privileges to PUBLIC, anon,
-  authenticated, or service_role. Batch-item inserts fail until the URL is
-  configured; schedule a maintenance window. The migration does not validate the
-  endpoint before applying.
+  exactly one lowercase `service_role_key` Vault entry and aborts otherwise. It
+  creates `public.batch_item_dispatch_config` empty but **does not create a
+  trigger**; no trigger in this repository or on hosted invokes the function,
+  and the current batch upload path (`batch_upload_sessions` /
+  `batch_upload_files` plus `process-receipt`) does not use it. Leave the table
+  empty unless a trigger is deliberately attached and a `process-batch-item`
+  Edge Function exists. The table is owned by postgres, has RLS enabled, and
+  grants no privileges to PUBLIC, anon, authenticated, or service_role. Once a
+  trigger is attached, batch-item inserts fail closed until the URL is
+  configured. The migration does not validate the endpoint before applying.
 - `supabase/migrations/20261106000000_stripe_checkout_locks_and_payment_fencing.sql`
   — adds `stripe_checkout_locks` and the checkout ownership RPCs, the
   service-only receipt-usage counter and trigger, and the fenced
@@ -459,7 +465,8 @@ bash .github/sql-regression/run-sql-regression.sh
 
 This is the execution evidence used by the `sql-regression` CI job. It builds
 a disposable loopback-only PostgreSQL 15 database, applies the curated initial
-schema plus the three billing migrations, and runs the five suites. The
+schema plus the billing restore and hardening migrations, and runs the five
+suites. The
 existing `invitation-auth-regression` job continues to own
 `supabase/tests/invitation_acceptance_auth.sql` on its own bare-Postgres
 database; it is not part of this runner.
