@@ -228,6 +228,37 @@ invalidated.
    the old tab fails with `42501`, stop and verify the alias grant and the
    authenticated self-scope check before proceeding.
 
+5. Confirm the legacy billing RPCs are no longer callable by browser roles.
+   `20261103000000_restore_billing_schema_drift.sql` revokes `PUBLIC`, `anon`
+   and `authenticated` execute on every overload of a broad billing RPC list,
+   including four functions that hosted currently exposes: 
+   `schedule_billing_reminder`, `get_upcoming_renewals`,
+   `get_email_delivery_stats`, and `cleanup_old_email_schedules`. Before the
+   restore an anonymous caller could queue reminder mail for any user, read
+   every subscriber's renewal rows, read cross-tenant delivery counts, and
+   delete old schedule rows. All four are called only from Edge Functions using
+   the service-role client, so no redeploy is needed. This is the same migration
+   that restores the drifted functions — there is no separate grant migration.
+
+   ```sql
+   select p.oid::regprocedure as signature,
+          has_function_privilege('anon', p.oid, 'EXECUTE') as anon,
+          has_function_privilege('authenticated', p.oid, 'EXECUTE') as authenticated,
+          has_function_privilege('service_role', p.oid, 'EXECUTE') as service_role
+   from pg_proc p
+   join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public'
+     and p.proname in ('schedule_billing_reminder', 'get_upcoming_renewals',
+                       'get_email_delivery_stats', 'cleanup_old_email_schedules');
+   -- every row: anon = false, authenticated = false, service_role = true
+   ```
+
+   `supabase/tests/billing_rpc_grants.sql` asserts this in the `sql-regression`
+   CI job. Then call each Edge Function that uses them (`email-scheduler` with a
+   `schedule_billing_reminders` action, `billing-auto-renewal`) and confirm a
+   `200` rather than `42501`; service-role access is the path those functions
+   use.
+
 ## 6. Deploy the functions
 
 Schema alone does not restore the live application contract. The production

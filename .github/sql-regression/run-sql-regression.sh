@@ -32,6 +32,7 @@ suite_list=(
   profile_billing_column_protection
   billing_schema_restore
   batch_item_dispatch_config
+  billing_rpc_grants
 )
 
 # The backend that owns the suites. This is intentionally an explicit list:
