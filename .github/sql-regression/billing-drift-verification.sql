@@ -58,7 +58,7 @@ BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM public.billing_email_schedule
     WHERE id = '25100000-0000-4000-8000-000000000013'
-      AND status = 'scheduled'::public.billing_email_status
+      AND status = 'scheduled'
       AND delivery_attempts = 1
       AND error_message = 'smtp down'
   ) OR NOT EXISTS (
@@ -75,7 +75,7 @@ BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM public.billing_email_schedule
     WHERE id = '25100000-0000-4000-8000-000000000013'
-      AND status = 'failed'::public.billing_email_status
+      AND status = 'failed'
       AND delivery_attempts = 2
       AND failed_at IS NOT NULL
   ) OR EXISTS (

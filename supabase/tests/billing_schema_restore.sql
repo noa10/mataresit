@@ -121,7 +121,7 @@ BEGIN
 
   -- Failure tracking must reach both branches without enum assignment errors.
   UPDATE public.billing_email_schedule
-  SET status = 'scheduled'::public.billing_email_status,
+  SET status = 'scheduled',
       delivery_attempts = 0,
       max_delivery_attempts = 2,
       failed_at = NULL,
@@ -135,7 +135,7 @@ BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM public.billing_email_schedule
     WHERE id = '25100000-0000-4000-8000-000000000004'
-      AND status = 'scheduled'::public.billing_email_status
+      AND status = 'scheduled'
       AND delivery_attempts = 1
       AND failed_at IS NULL
       AND error_message = 'smtp unavailable'
@@ -153,7 +153,7 @@ BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM public.billing_email_schedule
     WHERE id = '25100000-0000-4000-8000-000000000004'
-      AND status = 'failed'::public.billing_email_status
+      AND status = 'failed'
       AND delivery_attempts = 2
       AND failed_at IS NOT NULL
       AND error_message = 'smtp unavailable again'
