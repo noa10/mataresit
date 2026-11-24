@@ -39,24 +39,27 @@ supabase link --project-ref mpmkbtsufihzdelrlszs
 supabase migration list --remote
 ```
 
-`migration list` must show the billing restore plus every later billing/fencing
-migration that the remote lacks. As of this branch, the migrations this runbook
-depends on are:
+`migration list` must show the billing restore plus every later migration that
+the remote lacks. Verified against hosted history on 2026-11-24, exactly these
+seven are pending and nothing else:
 
 ```
 20261103000000  restore_billing_schema_drift
 20261104000000  stripe_production_hardening
 20261104000001  batch_item_vault_trigger
 20261106000000  stripe_checkout_locks_and_payment_fencing
+20261109000000  receipt_neighbor_lookup_indexes
+20261110000000  receipt_neighbor_date_indexes
 20261110010000  stripe_fencing_regressions
-20261110020000  fix_profile_timezone_normalization
 ```
 
-The remote may also lack `20261109000000` and `20261110000000` (index-only
-migrations); those are safe to apply with the chain. `20261106010000` (the
-gamification leaderboard fix from #235) is already applied remotely and must not
-reappear as pending. If a migration outside this billing/fencing/index set is
-pending, or the local/remote history disagrees, stop.
+`20261106010000` (gamification leaderboard fix, #235) and `20261110020000`
+(profile timezone normalization, #253) are **already applied** and must not
+reappear as pending. The two receipt-index migrations are ordinary
+`CREATE INDEX` statements and take a brief lock on `receipts`; at 806 rows that
+is negligible, but schedule them in the same window rather than separately. If
+a migration outside these seven is pending, or the local/remote history
+disagrees, stop.
 
 Dry run:
 
@@ -64,7 +67,7 @@ Dry run:
 supabase db push --remote --dry-run --include-all
 ```
 
-Confirm the dry run lists exactly the pending migrations above. Do not run
+Confirm the dry run lists exactly the seven migrations above. Do not run
 `supabase db reset --remote` under any circumstance.
 
 ## 2. Vault secret — before the migrations
@@ -77,26 +80,30 @@ Dashboard → Database → Vault → **New secret**:
 There must be exactly one row with that name. Never put the value in a file, a
 migration, or chat.
 
-**Known hosted mismatch.** Hosted currently has a single uppercase
-`SERVICE_ROLE_KEY` Vault secret and no lowercase `service_role_key`.
-`20261104000001_batch_item_vault_trigger.sql:48` counts only the lowercase name,
-so it raises `Expected exactly one service_role_key Vault secret` and aborts the
-push even though a service-role key is present. Create the lowercase secret
-(same value) before step 3, or rename the uppercase one if nothing else reads
-it. The migration is forward-only and cannot be fixed by a later migration
-because it aborts first.
+**Vault state (verified 2026-11-24).** The lowercase `service_role_key` now
+exists (created 2026-11-24 18:38 UTC), so `20261104000001` will pass its
+prerequisite check. The older uppercase `SERVICE_ROLE_KEY` (2026-11-04) is still
+present and is not read by any applied database function; it does not satisfy the
+migration but is harmless. Leave it until the rollout is verified, then delete it
+so only one credential name exists. Do not delete it before the push — if the
+lowercase entry turns out to hold a stale value, the uppercase one is the only
+remaining copy.
 
-This step **must** happen before step 3. Verify both the lowercase requirement
-and the uppercase duplicate:
+The name must stay lowercase: `20261104000001_batch_item_vault_trigger.sql:48`
+counts only `service_role_key` and aborts the whole push otherwise. That
+migration is forward-only and cannot be fixed by a later migration because it
+aborts first.
+
+Verify before step 3:
 
 ```sql
-select name, count(*)
+select name, count(*), min(created_at)
 from vault.decrypted_secrets
 where name in ('service_role_key', 'SERVICE_ROLE_KEY')
 group by name
 order by name;
--- service_role_key | 1   (required)
--- SERVICE_ROLE_KEY | 1   (may remain; it does not satisfy the migration)
+-- service_role_key | 1   (required; must hold the CURRENT service-role key)
+-- SERVICE_ROLE_KEY | 1   (legacy name; delete after a verified rollout)
 ```
 
 ## 3. Apply
