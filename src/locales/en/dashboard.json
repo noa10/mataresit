@@ -540,6 +540,9 @@
       "scanStreakValue_other": "{{count}} days"
     },
     "settings": {
+      "subscriptionLoading": "Loading subscription details…",
+      "subscriptionUnavailable": "Subscription details are unavailable. Please try again.",
+      "subscriptionRetry": "Try again",
       "eyebrow": "Account",
       "title": "Settings",
       "lede": "Preferences, plan usage, API keys — the workspace knobs in one place.",

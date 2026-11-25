@@ -218,7 +218,7 @@ async function processPaymentRetries() {
       .from('payment_retry_tracking')
       .select(`
         *,
-        profiles!inner(id, email, full_name, stripe_subscription_id)
+        profiles!inner(id, email, first_name, last_name, stripe_subscription_id)
       `)
       .eq('status', 'pending')
       .lte('next_retry_at', new Date().toISOString());

@@ -118,8 +118,8 @@ export default function SettingsPage() {
   const { t: ts } = useSettingsTranslation();
   const { language, changeLanguage } = useLanguage();
   const { theme, setMode } = useTheme();
-  const { subscriptionData, createPortalSession } = useStripe();
-  const { limits, usage, isLoading: usageLoading, getCurrentTier, isFeatureAvailable } = useSubscription();
+  const { subscriptionData, subscriptionLoading, refreshSubscription, createPortalSession } = useStripe();
+  const { limits, usage, isLoading: usageLoading, isFeatureAvailable } = useSubscription();
   const [searchParams, setSearchParams] = useSearchParams();
   const section = mapTabToSection(searchParams.get("tab"));
   const sectionsRef = useRef<HTMLElement | null>(null);
@@ -140,13 +140,13 @@ export default function SettingsPage() {
     );
   };
 
-  const tier = getCurrentTier() as keyof typeof SUBSCRIPTION_TIERS;
+  const tier = subscriptionData?.tier ?? "free";
   const tierConfig = SUBSCRIPTION_TIERS[tier] ?? SUBSCRIPTION_TIERS.free;
   const tierLabel = tierConfig.name;
   const isFree = tier === "free";
   const hasApiAccess = isFeatureAvailable("api_access");
 
-  const status = subscriptionData?.status ?? "active";
+  const status = subscriptionData?.status;
   const statusLabel = status === "active" ? t("workspace.settings.active") : status;
 
   const renewalDate = useMemo(
@@ -227,7 +227,7 @@ export default function SettingsPage() {
             <Panel
               title={t("workspace.settings.planTitle")}
               action={
-                isFree ? (
+                !subscriptionData ? null : isFree ? (
                   <Button variant="accent-outline" size="app" asChild>
                     <Link to="/pricing">{t("workspace.settings.upgrade")}</Link>
                   </Button>
@@ -239,7 +239,12 @@ export default function SettingsPage() {
                 )
               }
             >
-              <div className="grid gap-0.5">
+              {!subscriptionData ? (
+                <div role="status" className="space-y-3">
+                  <p>{t(subscriptionLoading ? "workspace.settings.subscriptionLoading" : "workspace.settings.subscriptionUnavailable")}</p>
+                  {!subscriptionLoading && <Button variant="accent-outline" size="app" onClick={() => void refreshSubscription()}>{t("workspace.settings.subscriptionRetry")}</Button>}
+                </div>
+              ) : <div className="grid gap-0.5">
                 <div className={setRowClass}>
                   <span className="min-w-0">
                     <span className="block text-[0.9375rem] font-medium text-ledger-ink">
@@ -317,11 +322,11 @@ export default function SettingsPage() {
                           })}
                   </span>
                 </div>
-              </div>
+              </div>}
             </Panel>
-            <div className="mt-5">
+            {subscriptionData && <div className="mt-5">
               <BillingPreferences />
-            </div>
+            </div>}
             </>
           )}
 

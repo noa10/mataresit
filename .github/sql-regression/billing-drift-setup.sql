@@ -49,7 +49,13 @@ ALTER TABLE public.profiles
   DROP COLUMN IF EXISTS next_billing_date,
   DROP COLUMN IF EXISTS grace_period_end_date,
   DROP COLUMN IF EXISTS last_payment_attempt,
-  DROP COLUMN IF EXISTS payment_retry_attempts;
+  DROP COLUMN IF EXISTS payment_retry_attempts,
+  DROP COLUMN IF EXISTS auto_renewal_enabled,
+  DROP COLUMN IF EXISTS auto_renewal_frequency,
+  DROP COLUMN IF EXISTS billing_email_enabled,
+  DROP COLUMN IF EXISTS billing_address,
+  DROP COLUMN IF EXISTS payment_method_brand,
+  DROP COLUMN IF EXISTS payment_method_last_four;
 ALTER TABLE public.payment_retry_tracking
   DROP COLUMN IF EXISTS amount_cents,
   DROP COLUMN IF EXISTS currency;

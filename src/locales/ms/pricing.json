@@ -505,6 +505,9 @@
     },
     "alreadyOnPlan": "Anda sudah menggunakan pelan {{plan}}.",
     "checkoutError": "Kami tidak dapat memulakan pembayaran. Sila cuba lagi.",
+    "subscriptionLoading": "Memuatkan butiran langganan…",
+    "subscriptionUnavailable": "Butiran langganan tidak tersedia. Sila cuba lagi sebelum menukar pelan anda.",
+    "subscriptionRetry": "Cuba lagi",
     "plansLabel": "Pelan"
   }
 }

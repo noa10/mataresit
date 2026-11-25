@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { loadStripe } from '@stripe/stripe-js';
 import { STRIPE_PUBLIC_KEY } from '@/config/stripe';
 import { useAuth } from '@/contexts/AuthContext';
@@ -24,6 +24,7 @@ interface StripeContextType {
   getSubscriptionStatus: () => Promise<SubscriptionData | null>;
   isLoading: boolean;
   subscriptionData: SubscriptionData | null;
+  subscriptionLoading: boolean;
   refreshSubscription: () => Promise<SubscriptionData | null>;
   forceRefreshSubscription: () => Promise<SubscriptionData | null>;
   lastRefreshTime: Date | null;
@@ -99,9 +100,15 @@ function toSubscriptionData(profile: ProfileSubscriptionRow): SubscriptionData {
 
 export const StripeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
+  const userId = user?.id;
   const [isLoading, setIsLoading] = useState(false);
-  const [subscriptionData, setSubscriptionData] = useState<SubscriptionData | null>(null);
+  const [subscriptionState, setSubscriptionState] = useState<{ userId: string; data: SubscriptionData } | null>(null);
+  const [subscriptionLoading, setSubscriptionLoading] = useState(true);
   const [lastRefreshTime, setLastRefreshTime] = useState<Date | null>(null);
+  const requestSequence = useRef(0);
+  // Keying the state by owner makes a response for a previous account
+  // unreadable instead of merely overwritten.
+  const subscriptionData = subscriptionState?.userId === userId ? subscriptionState.data : null;
 
   // One idempotency key per billing intent, reused across retries of the same
   // request. The key is dropped once the server answers a success or a 4xx
@@ -131,77 +138,54 @@ export const StripeProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return result;
   };
 
-  useEffect(() => {
-    if (user) {
-      refreshSubscription();
-    } else {
-      setSubscriptionData(null);
-    }
-  }, [user]);
-
-  const refreshSubscription = async (): Promise<SubscriptionData | null> => {
-    if (!user) return null;
+  const refreshSubscription = useCallback(async (): Promise<SubscriptionData | null> => {
+    if (!userId) return null;
+    const sequence = ++requestSequence.current;
+    const isCurrent = () => sequence === requestSequence.current;
+    setSubscriptionState(null);
+    setLastRefreshTime(null);
+    setSubscriptionLoading(true);
 
     try {
       const { data: profile, error } = await supabase
         .from('profiles')
         .select(PROFILE_SUBSCRIPTION_COLUMNS)
-        .eq('id', user.id)
-        .single()
-        .overrideTypes<ProfileSubscriptionRow, { merge: false }>();
-
-      if (error) {
-        if (error.code === 'PGRST116') {
-          const fallback: SubscriptionData = {
-            tier: 'free',
-            status: 'active',
-            receiptsUsedThisMonth: 0,
-          };
-          setSubscriptionData(fallback);
-          return fallback;
-        }
-        console.error('StripeContext: Error fetching subscription data:', error);
-        return null;
-      }
-
-      if (!profile) return null;
-
-      const newSubscriptionData = toSubscriptionData(profile);
-      setSubscriptionData(newSubscriptionData);
-      setLastRefreshTime(new Date());
-      return newSubscriptionData;
-    } catch (error) {
-      console.error('StripeContext: Error refreshing subscription:', error);
-      return null;
-    }
-  };
-
-  // Force refresh with cache bypass for webhook failure scenarios
-  const forceRefreshSubscription = async (): Promise<SubscriptionData | null> => {
-    if (!user) return null;
-
-    try {
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select(PROFILE_SUBSCRIPTION_COLUMNS)
-        .eq('id', user.id)
+        .eq('id', userId)
         .single()
         .overrideTypes<ProfileSubscriptionRow, { merge: false }>();
 
       if (error || !profile) {
-        console.error('StripeContext: Error force refreshing subscription data:', error);
+        console.error('StripeContext: Error fetching subscription data:', error);
         return null;
       }
+      if (!isCurrent()) return null;
 
-      const newSubscriptionData = toSubscriptionData(profile);
-      setSubscriptionData(newSubscriptionData);
+      const data = toSubscriptionData(profile);
+      setSubscriptionState({ userId, data });
       setLastRefreshTime(new Date());
-      return newSubscriptionData;
+      return data;
     } catch (error) {
-      console.error('StripeContext: Error force refreshing subscription:', error);
+      console.error('StripeContext: Error refreshing subscription:', error);
       return null;
+    } finally {
+      if (isCurrent()) setSubscriptionLoading(false);
     }
-  };
+  }, [userId]);
+
+  useEffect(() => {
+    if (userId) {
+      void refreshSubscription();
+    } else {
+      requestSequence.current++;
+      setSubscriptionState(null);
+      setLastRefreshTime(null);
+      setSubscriptionLoading(false);
+    }
+    return () => { requestSequence.current++; };
+  }, [userId, refreshSubscription]);
+
+  // The profile query is already uncached; both paths share failure handling.
+  const forceRefreshSubscription = refreshSubscription;
 
   const getSubscriptionStatus = async (): Promise<SubscriptionData | null> => {
     if (!user) return null;
@@ -431,6 +415,7 @@ export const StripeProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       getSubscriptionStatus,
       isLoading,
       subscriptionData,
+      subscriptionLoading,
       refreshSubscription,
       forceRefreshSubscription,
       lastRefreshTime,

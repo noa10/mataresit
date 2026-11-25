@@ -505,6 +505,9 @@
     },
     "alreadyOnPlan": "You are already on the {{plan}} plan.",
     "checkoutError": "We could not start checkout. Please try again.",
+    "subscriptionLoading": "Loading subscription details…",
+    "subscriptionUnavailable": "Subscription details are unavailable. Please try again before changing your plan.",
+    "subscriptionRetry": "Try again",
     "plansLabel": "Plans"
   }
 }

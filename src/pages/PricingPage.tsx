@@ -142,6 +142,8 @@ export default function PricingPage() {
     resumeSubscription,
     isLoading,
     subscriptionData,
+    subscriptionLoading,
+    refreshSubscription,
   } = useStripe();
   const { t } = usePricingTranslation();
   const { t: tHome } = useHomepageTranslation();
@@ -196,7 +198,7 @@ export default function PricingPage() {
   };
 
   const handleSubscribe = async (tierId: PlanId) => {
-    if (!user) {
+    if (!user || !subscriptionData || subscriptionLoading) {
       toast.error(copy("page.checkoutError"));
       return;
     }
@@ -248,7 +250,7 @@ export default function PricingPage() {
   };
 
   const handleDowngradeConfirm = async () => {
-    if (!downgradeDialog.targetTier) return;
+    if (!downgradeDialog.targetTier || !subscriptionData || subscriptionLoading) return;
 
     setDowngradeDialog((previous) => ({
       ...previous,
@@ -322,7 +324,7 @@ export default function PricingPage() {
         type="button"
         variant={planId === "free" ? "accent-outline" : planId === "pro" ? "ghost" : "accent"}
         onClick={() => handleSubscribe(planId)}
-        disabled={isLoading || isCurrent}
+        disabled={isLoading || isCurrent || !subscriptionData || subscriptionLoading}
         className={
           planId === "free"
             ? "mt-5 h-[46px] w-full rounded-lg border-ledger-line-strong bg-transparent text-[0.9375rem] font-semibold text-ledger-ink hover:bg-ledger-surface-2"
@@ -418,6 +420,12 @@ export default function PricingPage() {
 
         <section aria-label={copy("page.plansLabel")} className="pb-2 pt-[52px] max-[640px]:pt-9">
           <div className={shell}>
+            {user && !subscriptionData && (
+              <div role="status" className="mb-4 space-y-2 text-center">
+                <p>{copy(subscriptionLoading ? "page.subscriptionLoading" : "page.subscriptionUnavailable")}</p>
+                {!subscriptionLoading && <Button variant="outline" onClick={() => void refreshSubscription()}>{copy("page.subscriptionRetry")}</Button>}
+              </div>
+            )}
             <div className="mx-auto grid max-w-[520px] grid-cols-1 gap-3.5 min-[881px]:max-w-none min-[881px]:grid-cols-3 min-[1025px]:gap-5">
               {(["free", "pro", "max"] as PlanId[]).map((planId) => {
                 const isPro = planId === "pro";
@@ -425,7 +433,7 @@ export default function PricingPage() {
                 // claim a paid plan matches the selected interval.
                 const intervalKnown = subscriptionData?.billingIntervalReconciled !== false;
                 const isCurrent =
-                  Boolean(user) &&
+                  Boolean(user && subscriptionData && !subscriptionLoading) &&
                   planId === currentTier &&
                   (planId === "free" ||
                     (subscriptionActive && intervalKnown && currentInterval === billingInterval));
