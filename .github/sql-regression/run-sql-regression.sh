@@ -39,6 +39,7 @@ suite_list=(
   batch_item_dispatch_config
   billing_rpc_grants
   billing_preferences_rpc_revoke
+  renewal_tracking_overload
 )
 
 # The backend that owns the suites. This is intentionally an explicit list:
@@ -57,6 +58,7 @@ curated_migrations=(
   20261126000000_fix_billing_reminder_enum_compatibility.sql
   20261126010000_restore_profile_billing_columns.sql
   20261126020000_revoke_legacy_billing_preferences_rpc.sql
+  20261126030000_drop_redundant_renewal_tracking_overload.sql
 )
 
 mkdir -p "$log_dir"
@@ -241,6 +243,12 @@ for suite in "${suite_list[@]}"; do
     docker cp "${migrations_dir}/20261126020000_revoke_legacy_billing_preferences_rpc.sql" \
       "${container}:/tmp/pr234-billing-preferences-revoke-migration.sql"
     suite_args=(-v billing_revoke_migration=/tmp/pr234-billing-preferences-revoke-migration.sql)
+  fi
+  if [[ "$suite" == "renewal_tracking_overload" ]]; then
+    # The suite replays the actual migration via psql's include command.
+    docker cp "${migrations_dir}/20261126030000_drop_redundant_renewal_tracking_overload.sql" \
+      "${container}:/tmp/pr234-renewal-overload-migration.sql"
+    suite_args=(-v renewal_overload_migration=/tmp/pr234-renewal-overload-migration.sql)
   fi
   if psql_exec ${suite_args[@]+"${suite_args[@]}"} -f - < "$file" >> "${log_dir}/${suite}.log" 2>&1; then
     printf '%s\t%s\t%s\n' "$suite" "0" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$summary"
