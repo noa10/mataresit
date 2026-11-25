@@ -7,6 +7,7 @@ import {
   SubscriptionExpiryEmailData,
   PaymentConfirmationEmailData
 } from './templates.ts';
+import { escapeHtml } from '../_shared/html-escape.ts';
 
 /**
  * Generate subscription expiry email
@@ -55,8 +56,8 @@ export function generateSubscriptionExpiryEmail(data: SubscriptionExpiryEmailDat
       <h1>${isInGracePeriod ? '⏰ Grace Period Active' : '⚠️ Subscription Expired'}</h1>
     </div>
     <div class="content">
-      <h2>Hi ${data.recipientName},</h2>
-      
+      <h2>Hi ${escapeHtml(data.recipientName)},</h2>
+
       ${isInGracePeriod ? `
       <div class="alert-warning">
         <h3>Your subscription is in grace period</h3>
@@ -255,8 +256,8 @@ export function generatePaymentConfirmationEmail(data: PaymentConfirmationEmailD
       <h1>✅ Payment Successful</h1>
     </div>
     <div class="content">
-      <h2>Hi ${data.recipientName},</h2>
-      
+      <h2>Hi ${escapeHtml(data.recipientName)},</h2>
+
       <div class="success-alert">
         <h3>🎉 Thank you for your payment!</h3>
         <p>Your payment has been successfully processed and your Mataresit ${tierName} subscription is now active.</p>

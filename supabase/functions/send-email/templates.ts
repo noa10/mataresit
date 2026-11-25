@@ -1,6 +1,7 @@
 // Email Templates for Team Collaboration Features
 
 import { getFrontendUrl } from '../_shared/site-url.ts';
+import { escapeHtml } from '../_shared/html-escape.ts';
 
 export interface TeamInvitationEmailData {
   inviteeEmail: string;
@@ -434,7 +435,7 @@ export function generateReceiptProcessingEmail(data: ReceiptProcessingEmailData)
       <h1>${statusInfo.title}</h1>
     </div>
     <div class="content">
-      <p>Hi ${data.recipientName},</p>
+      <p>Hi ${escapeHtml(data.recipientName)},</p>
 
       <p>${statusInfo.message}</p>
 
@@ -554,7 +555,7 @@ export function generateBatchProcessingEmail(data: BatchProcessingEmailData): { 
       <h1>${title}</h1>
     </div>
     <div class="content">
-      <p>Hi ${data.recipientName},</p>
+      <p>Hi ${escapeHtml(data.recipientName)},</p>
 
       <p>${message}</p>
 
@@ -700,7 +701,7 @@ export function generateTeamCollaborationEmail(data: TeamCollaborationEmailData)
       <span class="team-badge">${data.teamName}</span>
     </div>
     <div class="content">
-      <p>Hi ${data.recipientName},</p>
+      <p>Hi ${escapeHtml(data.recipientName)},</p>
 
       <p>${actionInfo.message}</p>
 
@@ -1081,7 +1082,7 @@ function generateReceiptProcessingEmailMalay(data: ReceiptProcessingEmailData): 
       <h1>${statusInfo.title}</h1>
     </div>
     <div class="content">
-      <p>Hai ${data.recipientName},</p>
+      <p>Hai ${escapeHtml(data.recipientName)},</p>
 
       <p>${statusInfo.message}</p>
 
@@ -1306,7 +1307,7 @@ export function generateBillingReminderEmail(data: BillingReminderEmailData): { 
       <h1>💳 Subscription Renewal Reminder</h1>
     </div>
     <div class="content">
-      <h2>Hi ${data.recipientName},</h2>
+      <h2>Hi ${escapeHtml(data.recipientName)},</h2>
 
       <p>Your Mataresit <strong>${tierName}</strong> subscription is set to renew ${urgencyText}. We wanted to give you a heads up about your upcoming billing.</p>
 
@@ -1459,7 +1460,7 @@ export function generatePaymentFailedEmail(data: PaymentFailedEmailData): { subj
       <h1>❌ Payment Failed</h1>
     </div>
     <div class="content">
-      <h2>Hi ${data.recipientName},</h2>
+      <h2>Hi ${escapeHtml(data.recipientName)},</h2>
 
       ${isLastAttempt ? `
       <div class="alert-error">
