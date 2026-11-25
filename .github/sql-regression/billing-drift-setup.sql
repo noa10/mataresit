@@ -62,6 +62,21 @@ ALTER TABLE public.payment_retry_tracking
 ALTER TABLE public.subscription_renewal_tracking
   RENAME COLUMN auto_renewal_processed_at TO renewal_processed_at;
 
+-- Hosted also carries an 8-argument varchar overload of
+-- update_subscription_renewal_tracking that no migration declares. With the
+-- canonical 7-argument function present, the shared argument names make ordinary
+-- named calls ambiguous (42725), so the repair migration has to remove it.
+CREATE FUNCTION public.update_subscription_renewal_tracking(
+  p_user_id UUID,
+  p_stripe_subscription_id VARCHAR,
+  p_current_period_start TIMESTAMP WITH TIME ZONE,
+  p_current_period_end TIMESTAMP WITH TIME ZONE,
+  p_current_tier VARCHAR,
+  p_current_price_id VARCHAR,
+  p_renewal_amount NUMERIC DEFAULT NULL,
+  p_currency VARCHAR DEFAULT 'MYR'
+) RETURNS UUID LANGUAGE sql AS $$ SELECT NULL::UUID $$;
+
 -- Becomes due while the restore and verification run.
 INSERT INTO public.billing_email_schedule (
   id, user_id, reminder_type, scheduled_for, max_delivery_attempts
