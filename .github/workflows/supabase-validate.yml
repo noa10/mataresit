@@ -552,6 +552,8 @@ jobs:
             supabase/functions/_shared/billing_schema_restore_static_test.ts \
             supabase/functions/_shared/profile-name_test.ts \
             supabase/functions/_shared/billing_preferences_upsert_static_test.ts \
+            supabase/functions/_shared/html-escape_test.ts \
+            supabase/functions/_shared/email_template_escaping_static_test.ts \
             supabase/functions/_shared/function-auth_test.ts \
             supabase/functions/_shared/service-role_test.ts \
             supabase/functions/_shared/stripe-config_test.ts \

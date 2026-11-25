@@ -1,13 +1,15 @@
-// Guards the billing email templates against re-introducing an unescaped
-// recipient name into an HTML body.
+// Guards the email templates against re-introducing an unescaped user-supplied
+// value into an HTML body.
 //
-// profiles.first_name and profiles.last_name are writable by the account owner
-// through the profile editor, and a direct PostgREST write bypasses the client
-// side length and format checks. An unescaped name therefore lets a user place
-// markup and links inside mail sent from the platform's own sender domain.
+// The fields below are written by end users: profile names and team names
+// through the profile and team editors, free-text reasons and comments through
+// the claim and removal flows. A direct PostgREST write bypasses the client-side
+// length and format checks, so any of them can carry markup. Unescaped, that
+// markup and any links in it are delivered inside mail sent from the platform's
+// own sender domain.
 //
-// The same display name is interpolated into plain-text bodies, where escaping
-// would show up literally, so the rule is per sink: HTML sinks must escape,
+// The same values are interpolated into plain-text bodies, where escaping would
+// show up literally, so the rule is per sink: HTML sinks must escape,
 // plain-text sinks must not.
 
 const templateUrls = {
@@ -15,23 +17,57 @@ const templateUrls = {
   'billing-templates.ts': new URL('../send-email/billing-templates.ts', import.meta.url),
 } as const;
 
-const HTML_TAG_BEFORE_NAME = /<[a-z][a-z0-9]*\b[^>]*>\s*(?:Hi|Hai|Hello)\s+\$\{data\.recipientName\}/i;
-const HTML_TAG_AFTER_NAME = /\$\{data\.recipientName\}[^<]*<\//;
-const ESCAPED = '${escapeHtml(data.recipientName)}';
+// Fields whose value an end user can set. Keep this list in step with the
+// templates: a new user-writable field that reaches an HTML body belongs here.
+const USER_CONTROLLED_FIELDS = [
+  'recipientName',
+  'teamName',
+  'inviterName',
+  'role',
+  'removedUserName',
+  'removedByUserName',
+  'removedByUserEmail',
+  'removalReason',
+  'transferredToUserName',
+] as const;
 
-Deno.test('no HTML template interpolates a recipient name without escaping it', async () => {
+const HTML_LINE = /<[a-z][a-z0-9]*[\s>/]/i;
+
+Deno.test('no HTML body interpolates a user-controlled field without escaping it', async () => {
   const offenders: string[] = [];
 
   for (const [name, url] of Object.entries(templateUrls)) {
     const source = await Deno.readTextFile(url);
-    const lines = source.split('\n');
 
-    for (const [index, line] of lines.entries()) {
-      if (!line.includes('data.recipientName') || line.includes(ESCAPED)) {
-        continue;
+    for (const [index, line] of source.split('\n').entries()) {
+      if (!HTML_LINE.test(line)) continue;
+
+      for (const field of USER_CONTROLLED_FIELDS) {
+        if (!line.includes('${data.' + field + '}')) continue;
+        offenders.push(`${name}:${index + 1}: ${field} — ${line.trim()}`);
       }
+    }
+  }
 
-      if (HTML_TAG_BEFORE_NAME.test(line) || HTML_TAG_AFTER_NAME.test(line)) {
+  if (offenders.length > 0) {
+    throw new Error(
+      `User-controlled value interpolated into an HTML body without escapeHtml:\n${offenders.join('\n')}`,
+    );
+  }
+});
+
+Deno.test('every title element escapes the interpolated subject', async () => {
+  const offenders: string[] = [];
+
+  for (const [name, url] of Object.entries(templateUrls)) {
+    const source = await Deno.readTextFile(url);
+
+    for (const [index, line] of source.split('\n').entries()) {
+      // Subjects are built by interpolating the same user-controlled values
+      // (team name, actor name, merchant) and then dropped into <title>, so
+      // they need escaping at the sink even though the header itself must not
+      // be escaped.
+      if (line.includes('<title>${subject}</title>')) {
         offenders.push(`${name}:${index + 1}: ${line.trim()}`);
       }
     }
@@ -39,7 +75,7 @@ Deno.test('no HTML template interpolates a recipient name without escaping it', 
 
   if (offenders.length > 0) {
     throw new Error(
-      `Recipient name interpolated into an HTML body without escapeHtml:\n${offenders.join('\n')}`,
+      `Unescaped subject in a title element:\n${offenders.join('\n')}`,
     );
   }
 });
@@ -61,7 +97,7 @@ Deno.test('plain-text bodies keep the raw recipient name', async () => {
   // not be escaped, or the recipient sees HTML entities in their inbox.
   const escapedInText = source
     .split('\n')
-    .filter((line) => line.includes(ESCAPED) && !/<[a-z]/.test(line));
+    .filter((line) => line.includes('${escapeHtml(data.recipientName)}') && !HTML_LINE.test(line));
 
   if (escapedInText.length > 0) {
     throw new Error(
