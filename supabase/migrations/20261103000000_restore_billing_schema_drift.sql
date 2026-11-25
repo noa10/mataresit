@@ -3,8 +3,17 @@
 --
 -- That migration is recorded as applied in hosted migration history, but
 -- production is missing ten of its functions and all five of its triggers.
--- Every table it creates is present. One function exists only in an
--- unversioned shape:
+-- Every table it creates is present, but not in the shape it declares: the
+-- three billing enum types (billing_reminder_type, billing_email_status,
+-- auto_renewal_frequency) were never created there and their columns are
+-- plain character varying, and billing_email_schedule.failed_at is absent.
+--
+-- Those enums are not restored here. The deployed email-scheduler writes
+-- status values outside billing_email_status's domain ('rescheduled',
+-- 'retry_scheduled'), so re-imposing the enum would break it. Every function
+-- below therefore uses TEXT and bare string literals, which are valid against
+-- both the enum columns on a fresh database and the varchar columns on hosted.
+--
 --
 --   update_subscription_renewal_tracking(
 --     uuid, character varying, timestamptz, timestamptz,
@@ -27,6 +36,64 @@
 -- No credential values appear in this file. Never put a key in a tracked file.
 
 BEGIN;
+
+-- ---------------------------------------------------------------------------
+-- 0. Column drift from 20250722000000.
+--
+-- Hosted rebuilt the billing tables out of band: failed_at was dropped even
+-- though mark_billing_reminder_sent writes it. Restore the column before
+-- anything references it.
+-- ---------------------------------------------------------------------------
+
+ALTER TABLE public.billing_email_schedule
+  ADD COLUMN IF NOT EXISTS failed_at TIMESTAMP WITH TIME ZONE;
+
+-- Hosted defaults status to 'pending', a value nothing reads on this table:
+-- get_pending_billing_reminders only returns 'scheduled', so a reminder written
+-- through schedule_billing_reminder (which omits status) would never send.
+-- 20250722000000 declares 'scheduled'; restore that. The table is empty on
+-- hosted, so no existing row changes.
+ALTER TABLE public.billing_email_schedule
+  ALTER COLUMN status SET DEFAULT 'scheduled';
+
+-- Hosted also dropped four of the profiles columns that 20250722000000 adds,
+-- and the functions restored below write all four. Hosted's own
+-- update_subscription_renewal_tracking never touches profiles at all, so
+-- nothing currently maintains them. Add back only what these functions need.
+ALTER TABLE public.profiles
+  ADD COLUMN IF NOT EXISTS next_billing_date TIMESTAMP WITH TIME ZONE,
+  ADD COLUMN IF NOT EXISTS grace_period_end_date TIMESTAMP WITH TIME ZONE,
+  ADD COLUMN IF NOT EXISTS last_payment_attempt TIMESTAMP WITH TIME ZONE,
+  ADD COLUMN IF NOT EXISTS payment_retry_attempts INTEGER DEFAULT 0;
+
+-- payment_retry_tracking lost the amount it is retrying. The table is empty on
+-- hosted, so restoring the two columns is a no-op for existing data.
+ALTER TABLE public.payment_retry_tracking
+  ADD COLUMN IF NOT EXISTS amount_cents INTEGER,
+  ADD COLUMN IF NOT EXISTS currency TEXT;
+
+-- 20250722000000 names this column auto_renewal_processed_at; hosted and the
+-- generated frontend types call it renewal_processed_at. Converge on hosted's
+-- name so the function below writes the column the UI actually reads.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'subscription_renewal_tracking'
+      AND column_name = 'auto_renewal_processed_at'
+  ) AND NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'subscription_renewal_tracking'
+      AND column_name = 'renewal_processed_at'
+  ) THEN
+    ALTER TABLE public.subscription_renewal_tracking
+      RENAME COLUMN auto_renewal_processed_at TO renewal_processed_at;
+  END IF;
+END $$;
+
+-- Hosted's log_billing_event declares p_event_type before p_user_id, the
+-- reverse of 20250722000000's declaration. Every call site below therefore
+-- uses named notation, which resolves against both shapes.
 
 -- ---------------------------------------------------------------------------
 -- 1. Missing functions from 20250722000000.
@@ -128,21 +195,21 @@ BEGIN
   WHERE id = p_user_id;
 
   PERFORM public.log_billing_event(
-    p_user_id,
-    'subscription_renewal_tracking_updated',
-    'Subscription renewal tracking updated',
-    NULL,
-    p_stripe_subscription_id,
-    NULL,
-    '{}',
-    jsonb_build_object(
+    p_user_id => p_user_id,
+    p_event_type => 'subscription_renewal_tracking_updated',
+    p_event_description => 'Subscription renewal tracking updated',
+    p_stripe_event_id => NULL,
+    p_stripe_subscription_id => p_stripe_subscription_id,
+    p_stripe_payment_intent_id => NULL,
+    p_old_values => '{}',
+    p_new_values => jsonb_build_object(
       'tracking_id', tracking_id,
       'next_renewal_date', next_renewal,
       'current_tier', p_current_tier,
       'status', p_status
     ),
-    '{}',
-    'system'
+    p_metadata => '{}',
+    p_triggered_by => 'system'
   );
 
   RETURN tracking_id;
@@ -192,34 +259,39 @@ BEGIN
 
   -- Log the event
   PERFORM public.log_billing_event(
-    p_user_id,
-    'payment_retry_created',
-    'Payment retry tracking created',
-    NULL,
-    p_stripe_subscription_id,
-    NULL,
-    '{}',
-    jsonb_build_object(
+    p_user_id => p_user_id,
+    p_event_type => 'payment_retry_created',
+    p_event_description => 'Payment retry tracking created',
+    p_stripe_event_id => NULL,
+    p_stripe_subscription_id => p_stripe_subscription_id,
+    p_stripe_payment_intent_id => NULL,
+    p_old_values => '{}',
+    p_new_values => jsonb_build_object(
       'retry_id', retry_id,
       'invoice_id', p_stripe_invoice_id,
       'amount_cents', p_amount_cents,
       'max_attempts', p_max_attempts,
       'next_retry_at', next_retry
     ),
-    '{}',
-    'system'
+    p_metadata => '{}',
+    p_triggered_by => 'system'
   );
 
   RETURN retry_id;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+-- A database built from 20250722000000 already has this function returning the
+-- enum type, and CREATE OR REPLACE cannot change a return type. Drop it first;
+-- the grant section below re-grants it by identity after it is recreated.
+DROP FUNCTION IF EXISTS public.get_pending_billing_reminders();
+
 CREATE OR REPLACE FUNCTION public.get_pending_billing_reminders()
 RETURNS TABLE (
   schedule_id UUID,
   user_id UUID,
   subscription_id TEXT,
-  reminder_type public.billing_reminder_type,
+  reminder_type TEXT,
   scheduled_for TIMESTAMP WITH TIME ZONE,
   template_data JSONB,
   language TEXT,
@@ -231,13 +303,13 @@ BEGIN
   SELECT
     bes.id as schedule_id,
     bes.user_id,
-    bes.subscription_id,
-    bes.reminder_type,
+    bes.subscription_id::TEXT,
+    bes.reminder_type::TEXT,
     bes.scheduled_for,
     bes.template_data,
-    bes.language,
-    p.email as user_email,
-    COALESCE(NULLIF(TRIM(CONCAT_WS(' ', p.first_name, p.last_name)), ''), p.email) as user_name
+    bes.language::TEXT,
+    p.email::TEXT as user_email,
+    COALESCE(NULLIF(TRIM(CONCAT_WS(' ', p.first_name, p.last_name)), ''), p.email)::TEXT as user_name
   FROM public.billing_email_schedule bes
   JOIN public.profiles p ON p.id = bes.user_id
   WHERE bes.status = 'scheduled'
@@ -285,27 +357,27 @@ BEGIN
   -- Update renewal tracking to mark as processed
   UPDATE public.subscription_renewal_tracking
   SET
-    auto_renewal_processed_at = NOW(),
+    renewal_processed_at = NOW(),
     updated_at = NOW()
   WHERE user_id = p_user_id
     AND stripe_subscription_id = p_stripe_subscription_id;
 
   -- Log the auto-renewal processing
   PERFORM public.log_billing_event(
-    p_user_id,
-    'auto_renewal_processed',
-    'Auto-renewal processing initiated',
-    NULL,
-    p_stripe_subscription_id,
-    NULL,
-    '{}',
-    jsonb_build_object(
+    p_user_id => p_user_id,
+    p_event_type => 'auto_renewal_processed',
+    p_event_description => 'Auto-renewal processing initiated',
+    p_stripe_event_id => NULL,
+    p_stripe_subscription_id => p_stripe_subscription_id,
+    p_stripe_payment_intent_id => NULL,
+    p_old_values => '{}',
+    p_new_values => jsonb_build_object(
       'renewal_date', renewal_record.next_renewal_date,
       'current_tier', renewal_record.current_tier,
       'auto_renewal_enabled', renewal_record.auto_renewal_enabled
     ),
-    '{}',
-    'system'
+    p_metadata => '{}',
+    p_triggered_by => 'system'
   );
 
   RETURN jsonb_build_object(
@@ -368,23 +440,52 @@ BEGIN
 
   -- Log the renewal failure
   PERFORM public.log_billing_event(
-    p_user_id,
-    'renewal_failure',
-    'Subscription renewal failed, entering grace period',
-    NULL,
-    p_stripe_subscription_id,
-    p_stripe_invoice_id,
-    '{}',
-    jsonb_build_object(
+    p_user_id => p_user_id,
+    p_event_type => 'renewal_failure',
+    p_event_description => 'Subscription renewal failed, entering grace period',
+    p_stripe_event_id => NULL,
+    p_stripe_subscription_id => p_stripe_subscription_id,
+    p_stripe_payment_intent_id => p_stripe_invoice_id,
+    p_old_values => '{}',
+    p_new_values => jsonb_build_object(
       'failure_reason', p_failure_reason,
       'grace_period_end', grace_period_end,
       'retry_tracking_id', retry_id
     ),
-    '{}',
-    'system'
+    p_metadata => '{}',
+    p_triggered_by => 'system'
   );
 
   RETURN retry_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Hosted carries this insert-only wrapper with varchar parameters; the enum-typed
+-- variant from 20250722000002 was never applied there. Recreate it so the batch
+-- scheduler below cannot depend on a function that drift may have removed. It
+-- matches what hosted already runs, so this is a no-op there.
+CREATE OR REPLACE FUNCTION public.schedule_billing_reminder(
+  p_user_id UUID,
+  p_subscription_id VARCHAR,
+  p_reminder_type VARCHAR,
+  p_scheduled_for TIMESTAMP WITH TIME ZONE,
+  p_template_data JSONB DEFAULT '{}'::JSONB,
+  p_language VARCHAR DEFAULT 'en'
+) RETURNS UUID AS $$
+DECLARE
+  v_schedule_id UUID;
+BEGIN
+  INSERT INTO billing_email_schedule (
+    user_id, subscription_id, reminder_type, scheduled_for,
+    template_data, language
+  )
+  VALUES (
+    p_user_id, p_subscription_id, p_reminder_type, p_scheduled_for,
+    p_template_data, p_language
+  )
+  RETURNING id INTO v_schedule_id;
+
+  RETURN v_schedule_id;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
@@ -420,7 +521,7 @@ BEGIN
       SELECT public.schedule_billing_reminder(
         (reminder->>'user_id')::UUID,
         reminder->>'subscription_id',
-        (reminder->>'reminder_type')::public.billing_reminder_type,
+        reminder->>'reminder_type',
         (reminder->>'scheduled_for')::TIMESTAMP WITH TIME ZONE,
         COALESCE(reminder->'template_data', '{}'::JSONB),
         COALESCE(reminder->>'language', 'en')
@@ -460,7 +561,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE OR REPLACE FUNCTION public.get_my_billing_preferences()
 RETURNS TABLE (
   auto_renewal_enabled BOOLEAN,
-  auto_renewal_frequency public.auto_renewal_frequency,
+  auto_renewal_frequency TEXT,
   billing_email_enabled BOOLEAN,
   reminder_days_before_renewal INTEGER[],
   payment_failure_notifications BOOLEAN,
@@ -481,7 +582,7 @@ BEGIN
   RETURN QUERY
   SELECT
     COALESCE(bp.auto_renewal_enabled, true),
-    COALESCE(bp.auto_renewal_frequency, 'monthly'::public.auto_renewal_frequency),
+    COALESCE(bp.auto_renewal_frequency::TEXT, 'monthly'),
     COALESCE(bp.billing_email_enabled, true),
     COALESCE(bp.reminder_days_before_renewal, '{7,3,1}'::INTEGER[]),
     COALESCE(bp.payment_failure_notifications, true),
@@ -489,14 +590,19 @@ BEGIN
     COALESCE(bp.max_payment_retry_attempts, 3),
     COALESCE(bp.retry_interval_hours, 24),
     COALESCE(bp.grace_period_days, 7),
-    COALESCE(bp.preferred_language, 'en'),
-    COALESCE(bp.timezone, 'UTC'),
+    COALESCE(bp.preferred_language::TEXT, 'en'),
+    COALESCE(bp.timezone::TEXT, 'UTC'),
     bp.quiet_hours_start,
     bp.quiet_hours_end
   FROM (VALUES (1)) AS defaults(dummy)
   LEFT JOIN public.billing_preferences bp ON bp.user_id = auth.uid();
 END;
 $$;
+
+-- Hosted still returns SETOF billing_preferences here, and CREATE OR REPLACE
+-- cannot change a return type. Drop the legacy body first; the grant section
+-- below re-grants the function by identity after it is recreated.
+DROP FUNCTION IF EXISTS public.get_billing_preferences(UUID);
 
 -- Compatibility wrapper for the browser bundle that was already deployed when
 -- this migration ships. It preserves the original eleven-column contract,
@@ -507,7 +613,7 @@ $$;
 CREATE OR REPLACE FUNCTION public.get_billing_preferences(p_user_id UUID)
 RETURNS TABLE (
   auto_renewal_enabled BOOLEAN,
-  auto_renewal_frequency public.auto_renewal_frequency,
+  auto_renewal_frequency TEXT,
   billing_email_enabled BOOLEAN,
   reminder_days_before_renewal INTEGER[],
   payment_failure_notifications BOOLEAN,
@@ -527,7 +633,7 @@ BEGIN
   RETURN QUERY
   SELECT
     COALESCE(bp.auto_renewal_enabled, true),
-    COALESCE(bp.auto_renewal_frequency, 'monthly'::public.auto_renewal_frequency),
+    COALESCE(bp.auto_renewal_frequency::TEXT, 'monthly'),
     COALESCE(bp.billing_email_enabled, true),
     COALESCE(bp.reminder_days_before_renewal, '{7,3,1}'::INTEGER[]),
     COALESCE(bp.payment_failure_notifications, true),
@@ -535,8 +641,8 @@ BEGIN
     COALESCE(bp.max_payment_retry_attempts, 3),
     COALESCE(bp.retry_interval_hours, 24),
     COALESCE(bp.grace_period_days, 7),
-    COALESCE(bp.preferred_language, 'en'),
-    COALESCE(bp.timezone, 'UTC')
+    COALESCE(bp.preferred_language::TEXT, 'en'),
+    COALESCE(bp.timezone::TEXT, 'UTC')
   FROM public.billing_preferences bp
   WHERE bp.user_id = p_user_id;
 
@@ -544,7 +650,7 @@ BEGIN
     RETURN QUERY
     SELECT
       true,
-      'monthly'::public.auto_renewal_frequency,
+      'monthly',
       true,
       '{7,3,1}'::INTEGER[],
       true,
@@ -611,10 +717,11 @@ CREATE TRIGGER validate_billing_reminder_schedule_trigger
   FOR EACH ROW EXECUTE FUNCTION public.validate_billing_reminder_schedule();
 
 -- The canonical function in 20250722000000 assigns an untyped CASE result to
--- the billing_email_status enum. On hosted PostgreSQL that failure branch
--- raises "column status is of type billing_email_status but expression is of
--- type text", leaving failed reminders scheduled forever. Replace the
--- function with explicit enum casts while preserving its audit event.
+-- the billing_email_status enum. Hosted never had that enum: the column is
+-- plain character varying, and the deployed email-scheduler writes status
+-- values outside the enum's domain ('rescheduled', 'retry_scheduled'). Assign
+-- bare string literals so the function is valid whether the column is the
+-- enum on a fresh database or varchar on hosted.
 CREATE OR REPLACE FUNCTION public.mark_billing_reminder_sent(
   p_schedule_id UUID,
   p_success BOOLEAN DEFAULT true,
@@ -635,7 +742,7 @@ BEGIN
   IF p_success THEN
     UPDATE public.billing_email_schedule
     SET
-      status = 'sent'::public.billing_email_status,
+      status = 'sent',
       sent_at = now(),
       delivery_attempts = delivery_attempts + 1,
       updated_at = now()
@@ -645,8 +752,8 @@ BEGIN
     SET
       status = CASE
         WHEN delivery_attempts + 1 >= max_delivery_attempts
-          THEN 'failed'::public.billing_email_status
-        ELSE 'scheduled'::public.billing_email_status
+          THEN 'failed'
+        ELSE 'scheduled'
       END,
       failed_at = CASE
         WHEN delivery_attempts + 1 >= max_delivery_attempts THEN now()
@@ -659,22 +766,22 @@ BEGIN
   END IF;
 
   PERFORM public.log_billing_event(
-    reminder_record.user_id,
-    CASE WHEN p_success THEN 'billing_reminder_sent' ELSE 'billing_reminder_failed' END,
-    'Billing reminder email ' || CASE WHEN p_success THEN 'sent successfully' ELSE 'failed to send' END,
-    NULL,
-    reminder_record.subscription_id,
-    NULL,
-    '{}',
-    jsonb_build_object(
+    p_user_id => reminder_record.user_id,
+    p_event_type => CASE WHEN p_success THEN 'billing_reminder_sent' ELSE 'billing_reminder_failed' END,
+    p_event_description => 'Billing reminder email ' || CASE WHEN p_success THEN 'sent successfully' ELSE 'failed to send' END,
+    p_stripe_event_id => NULL,
+    p_stripe_subscription_id => reminder_record.subscription_id,
+    p_stripe_payment_intent_id => NULL,
+    p_old_values => '{}',
+    p_new_values => jsonb_build_object(
       'schedule_id', p_schedule_id,
       'reminder_type', reminder_record.reminder_type,
       'success', p_success,
       'error_message', p_error_message,
       'delivery_attempts', reminder_record.delivery_attempts + 1
     ),
-    '{}',
-    'system'
+    p_metadata => '{}',
+    p_triggered_by => 'system'
   );
 
   RETURN true;

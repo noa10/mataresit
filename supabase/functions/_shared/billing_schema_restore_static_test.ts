@@ -48,8 +48,12 @@ Deno.test('the restore migration revokes every overload including the stray anon
   const migration = await Deno.readTextFile(restoreUrl);
 
   // The unversioned eight-argument function must be revoked, but not dropped:
-  // the deployed older build may still call it.
-  if (migration.includes('DROP FUNCTION') ||
+  // the deployed older build may still call it. The two functions whose return
+  // type changes must be dropped first, because CREATE OR REPLACE cannot change
+  // a return type and a database built from 20250722000000 already has them.
+  if (migration.includes('DROP FUNCTION IF EXISTS public.update_subscription_renewal_tracking') ||
+    !migration.includes('DROP FUNCTION IF EXISTS public.get_billing_preferences(UUID)') ||
+    !migration.includes('DROP FUNCTION IF EXISTS public.get_pending_billing_reminders()') ||
     !migration.includes('pg_get_function_identity_arguments(p.oid)') ||
     !migration.includes("'REVOKE ALL ON FUNCTION %I.%I(%s) FROM PUBLIC, anon, authenticated'") ||
     !migration.includes("'GRANT EXECUTE ON FUNCTION %I.%I(%s) TO service_role'")) {
@@ -80,14 +84,29 @@ Deno.test('the restore migration keeps the legacy preferences path self-scoped a
       "auth.role() IS DISTINCT FROM 'service_role'",
       'GRANT EXECUTE ON FUNCTION public.get_billing_preferences(UUID) TO authenticated, service_role;',
       'CREATE OR REPLACE FUNCTION public.mark_billing_reminder_sent(',
-      "'failed'::public.billing_email_status",
-      "'scheduled'::public.billing_email_status",
+      "THEN 'failed'",
+      "ELSE 'scheduled'",
+      "ALTER COLUMN status SET DEFAULT 'scheduled'",
       "pg_get_expr(conbin, conrelid) ~* 'scheduled_for'",
       'A time-dependent billing schedule constraint remains',
     ] as const
   ) {
     if (!migration.includes(expected)) {
       throw new Error(`The restore migration must contain: ${expected}`);
+    }
+  }
+
+  for (
+    const forbidden of [
+      '::public.billing_email_status',
+      '::public.billing_reminder_type',
+      '::public.auto_renewal_frequency',
+    ] as const
+  ) {
+    if (migration.includes(forbidden)) {
+      throw new Error(
+        `The restore migration must not cast to ${forbidden.slice(2)}: hosted never created that type`,
+      );
     }
   }
 
@@ -108,6 +127,11 @@ Deno.test('the drift fixture covers an equivalent constraint and failed delivery
     const expected of [
       'billing_email_schedule_due_time_custom',
       '25100000-0000-4000-8000-000000000013',
+      'DROP TYPE IF EXISTS public.billing_reminder_type',
+      'DROP TYPE IF EXISTS public.billing_email_status',
+      'DROP TYPE IF EXISTS public.auto_renewal_frequency',
+      'DROP COLUMN IF EXISTS failed_at',
+      'RENAME COLUMN auto_renewal_processed_at TO renewal_processed_at',
     ] as const
   ) {
     if (!setup.includes(expected)) {

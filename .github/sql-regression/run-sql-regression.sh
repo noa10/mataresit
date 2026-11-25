@@ -24,6 +24,11 @@ migrations_dir="${repo_root}/supabase/migrations"
 tests_dir="${repo_root}/supabase/tests"
 log_dir="${PR234_SQL_LOG_DIR:-/tmp/pr234-sql-regression}"
 container="${SUPABASE_DB_CONTAINER:-}"
+billing_shape="${PR234_BILLING_SCHEMA_SHAPE:-varchar}"
+case "$billing_shape" in
+  enum|varchar) ;;
+  *) printf 'Unknown billing schema shape: %s\n' "$billing_shape" >&2; exit 2 ;;
+esac
 suite_list=(
   stripe_webhook_claim_fencing
   payment_state_fencing
@@ -48,6 +53,7 @@ curated_migrations=(
   20261104000001_batch_item_vault_trigger.sql
   20261106000000_stripe_checkout_locks_and_payment_fencing.sql
   20261110010000_stripe_fencing_regressions.sql
+  20261126000000_fix_billing_reminder_enum_compatibility.sql
 )
 
 mkdir -p "$log_dir"
@@ -152,13 +158,54 @@ if [[ "$mode" == "disposable" ]]; then
   run_file "initial schema" "${migrations_dir}/20231126000000_initial_schema.sql"
   run_file "profiles.email shim" "${scripts_dir}/email-column.sql"
   for migration in "${curated_migrations[@]:1}"; do
-    if [[ "$migration" == "20261103000000_restore_billing_schema_drift.sql" ]]; then
+    if [[ "$migration" == "20261103000000_restore_billing_schema_drift.sql" && "$billing_shape" == "varchar" ]]; then
       run_file "seed billing schema drift" "${scripts_dir}/billing-drift-setup.sql"
     fi
+    if [[ "$migration" == "20261126000000_fix_billing_reminder_enum_compatibility.sql" && "$billing_shape" == "enum" ]]; then
+      # An unexpected enum RPC must fail the migration and leave the original
+      # functions intact. Restore the real enum function afterward.
+      psql_exec <<'SQL'
+ALTER FUNCTION public.schedule_billing_reminder(uuid, text, public.billing_reminder_type, timestamptz, jsonb, text)
+  RENAME TO schedule_billing_reminder_fixture_original;
+CREATE FUNCTION public.schedule_billing_reminder(
+  wrong_user_id uuid, p_subscription_id text, p_reminder_type public.billing_reminder_type,
+  p_scheduled_for timestamptz, p_template_data jsonb DEFAULT '{}', p_language text DEFAULT 'en'
+) RETURNS uuid LANGUAGE sql AS 'SELECT NULL::uuid';
+SQL
+      function_state_sql="SELECT md5(string_agg(pg_get_functiondef(p.oid) || coalesce(p.proacl::text, ''), E'\\n' ORDER BY p.oid)) FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'public' AND p.proname IN ('schedule_billing_reminder', 'schedule_billing_reminder_fixture_original', 'schedule_multiple_billing_reminders', 'mark_billing_reminder_sent')"
+      original_function_state="$(psql_exec -tAc "$function_state_sql")"
+      if psql_exec -f - < "${migrations_dir}/${migration}" > "${log_dir}/expected-enum-guard-error.log" 2>&1; then
+        printf 'Expected unexpected enum scheduler to reject migration\n' >&2
+        exit 1
+      fi
+      if ! grep -Fq 'enum schema is missing the canonical schedule_billing_reminder RPC signature' "${log_dir}/expected-enum-guard-error.log"; then
+        printf 'Migration failed without the expected enum scheduler error\n' >&2
+        exit 1
+      fi
+      if [[ "$(psql_exec -tAc "$function_state_sql")" != "$original_function_state" ]]; then
+        printf 'Rejected migration changed billing function definitions or grants\n' >&2
+        exit 1
+      fi
+      psql_exec <<'SQL'
+DO $$ BEGIN
+  IF to_regprocedure('public.schedule_billing_reminder(uuid,character varying,character varying,timestamptz,jsonb,character varying)') IS NULL THEN
+    RAISE EXCEPTION 'nonmatching enum scheduler caused the varchar overload to be dropped';
+  END IF;
+END $$;
+DROP FUNCTION public.schedule_billing_reminder(uuid, text, public.billing_reminder_type, timestamptz, jsonb, text);
+ALTER FUNCTION public.schedule_billing_reminder_fixture_original(uuid, text, public.billing_reminder_type, timestamptz, jsonb, text)
+  RENAME TO schedule_billing_reminder;
+SQL
+    fi
     run_file "$migration" "${migrations_dir}/${migration}"
+    if [[ "$migration" == "20261126000000_fix_billing_reminder_enum_compatibility.sql" ]]; then
+      run_file "replay billing reminder enum repair" "${migrations_dir}/${migration}"
+    fi
     if [[ "$migration" == "20261103000000_restore_billing_schema_drift.sql" ]]; then
       run_file "replay billing schema restore" "${migrations_dir}/${migration}"
-      run_file "verify billing schema drift restore" "${scripts_dir}/billing-drift-verification.sql"
+      if [[ "$billing_shape" == "varchar" ]]; then
+        run_file "verify billing schema drift restore" "${scripts_dir}/billing-drift-verification.sql"
+      fi
     fi
   done
 fi

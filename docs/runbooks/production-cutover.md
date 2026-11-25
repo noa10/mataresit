@@ -2,7 +2,18 @@
 
 Run only with owner authorization, a maintenance window, and a fresh backup.
 This is the sanctioned path (`supabase` CLI + linked project), not direct
-database access.
+database access. The steps below are reusable guidance for any remaining or
+future rollout; check the actual state before taking action.
+
+**Rollout status (reported 2026-11-25; not freshly revalidated):** the seven
+original migrations listed below, including the restore from commit `498f0fa`,
+were applied on 2026-11-25. The follow-up
+`20261126000000_fix_billing_reminder_enum_compatibility` migration has not been
+deployed; PR #266 remains open. The frontend was deployed before the push, and
+Edge Functions were deployed on 2026-11-25. Cache invalidation is unverified, and
+the fresh-tab and old/cached-tab billing preference smoke tests are incomplete.
+Check remote migration history and deployed function versions before deciding
+what remains to be done.
 
 ## Preconditions
 
@@ -16,19 +27,17 @@ database access.
   every hosted *database* command below passes `--remote`. `functions deploy`
   targets the linked project by default; `--remote` only selects another one.
 
-> **`--include-all` is required.** The remote database already has
-> `20261106010000` (the gamification leaderboard fix from #235), while the
-> billing restore and the billing/fencing migrations are older and still
-> pending. `supabase db push` refuses this out-of-order set with a
-> `missing-remote` error unless `--include-all` is passed. The flag only adds
-> local migrations missing from the remote history; it does not re-apply
-> anything already recorded there.
+> **Out-of-order migrations.** If the dry run shows an approved migration older
+> than one already recorded remotely, `supabase db push` may require
+> `--include-all`. The flag includes local migrations missing from remote
+> history; it does not re-apply recorded migrations. Review the entire dry-run
+> list before using it, since it can include other missing migrations too.
 
-> **Current live state.** The deployed frontend already selects
-> `profiles.cancel_at_period_end`/`billing_interval` and calls
-> `change_plan`/`resume`. Until the migration (step 3) and the function deploy
-> (step 6) are complete, subscription state may fail to load and plan-change
-> actions may return 400.
+> **Historical frontend observation (before the 2026-11-25 push).** The deployed
+> frontend selected `profiles.cancel_at_period_end`/`billing_interval` and called
+> `change_plan`/`resume` before the database push. Missing schema or outdated
+> functions could cause subscription loading failures or 400 responses; the
+> push alone does not establish that the deployed application now works.
 
 ## 1. Preflight
 
@@ -39,9 +48,9 @@ supabase link --project-ref mpmkbtsufihzdelrlszs
 supabase migration list --remote
 ```
 
-`migration list` must show the billing restore plus every later migration that
-the remote lacks. Verified against hosted history on 2026-11-24, exactly these
-seven are pending and nothing else:
+Compare local and remote history and review every migration that is actually
+pending. The following seven were observed pending on 2026-11-24 and reported
+applied on 2026-11-25; this is a historical list, not an expected pending set:
 
 ```
 20261103000000  restore_billing_schema_drift
@@ -53,13 +62,13 @@ seven are pending and nothing else:
 20261110010000  stripe_fencing_regressions
 ```
 
-`20261106010000` (gamification leaderboard fix, #235) and `20261110020000`
-(profile timezone normalization, #253) are **already applied** and must not
-reappear as pending. The two receipt-index migrations are ordinary
-`CREATE INDEX` statements and take a brief lock on `receipts`; at 806 rows that
-is negligible, but schedule them in the same window rather than separately. If
-a migration outside these seven is pending, or the local/remote history
-disagrees, stop.
+In the 2026-11-24 observation, `20261106010000` (gamification leaderboard
+fix, #235) and `20261110020000` (profile timezone normalization, #253) were
+already applied. The two receipt-index migrations above use ordinary
+`CREATE INDEX` statements and briefly lock `receipts`; the observed table had
+806 rows at that time. For any future index migration, assess the current
+size and lock impact when scheduling the window. If there is unexplained
+history drift or an unreviewed migration appears, stop and investigate.
 
 Dry run:
 
@@ -67,77 +76,74 @@ Dry run:
 supabase db push --remote --dry-run --include-all
 ```
 
-Confirm the dry run lists exactly the seven migrations above. Do not run
-`supabase db reset --remote` under any circumstance.
+Confirm the dry run matches the reviewed, authorized pending set. If it is
+empty, do not push; continue with the outstanding verification steps. Do not
+run `supabase db reset --remote` under any circumstance.
 
-## 2. Vault secret — before the migrations
+## 2. Vault prerequisite
 
-Dashboard → Database → Vault → **New secret**:
+The Vault credential was already replaced for this rollout. Do not create,
+replace, or delete either Vault entry as a routine step for the completed push.
+The historical 2026-11-24 observation was one lowercase `service_role_key` and
+one uppercase `SERVICE_ROLE_KEY`; it predates the replacement and is not a
+statement of current Vault contents.
 
-- name: `service_role_key` (lowercase — Vault secret names are case-sensitive)
-- value: the production service-role key from Project Settings → API
+For a different environment where `20261104000001` is actually pending, verify
+that exactly one lowercase `service_role_key` exists and holds the current
+service-role key. The migration counts that case-sensitive name and aborts
+otherwise; an uppercase entry does not satisfy the check. If remediation is
+needed, follow the authorized credential-management procedure in Dashboard →
+Database → Vault. Never put the value in a file, migration, or chat.
 
-There must be exactly one row with that name. Never put the value in a file, a
-migration, or chat.
-
-**Vault state (verified 2026-11-24).** The lowercase `service_role_key` now
-exists (created 2026-11-24 18:38 UTC), so `20261104000001` will pass its
-prerequisite check. The older uppercase `SERVICE_ROLE_KEY` (2026-11-04) is still
-present and is not read by any applied database function; it does not satisfy the
-migration but is harmless. Leave it until the rollout is verified, then delete it
-so only one credential name exists. Do not delete it before the push — if the
-lowercase entry turns out to hold a stale value, the uppercase one is the only
-remaining copy.
-
-The name must stay lowercase: `20261104000001_batch_item_vault_trigger.sql:48`
-counts only `service_role_key` and aborts the whole push otherwise. That
-migration is forward-only and cannot be fixed by a later migration because it
-aborts first.
-
-Verify before step 3:
+A name/count check, when authorized, does not establish that the stored value is
+current:
 
 ```sql
-select name, count(*), min(created_at)
+select name, count(*)
 from vault.decrypted_secrets
 where name in ('service_role_key', 'SERVICE_ROLE_KEY')
 group by name
 order by name;
--- service_role_key | 1   (required; must hold the CURRENT service-role key)
--- SERVICE_ROLE_KEY | 1   (legacy name; delete after a verified rollout)
+-- service_role_key | 1   (required if the migration is pending)
 ```
 
 ## 3. Apply
 
+Only if the dry run identifies reviewed and authorized pending migrations, apply
+the same set with the required flags (including `--include-all` when needed):
+
 ```bash
 supabase db push --remote --include-all --yes
-supabase migration list --remote   # every pending migration now applied
+supabase migration list --remote   # confirm the reviewed migrations were applied
 ```
 
-If the push stops on `20261104000001` because the Vault secret is missing,
-create the secret (step 2) and rerun the same push. Migrations already applied
-in the first attempt are skipped.
+If a future push stops on `20261104000001` because the Vault secret is missing,
+resolve the prerequisite through the authorized procedure in step 2, then rerun
+the reviewed push. Migrations already applied in the first attempt are skipped.
 
-## 4. Batch dispatch configuration (legacy path, currently unattached)
+## 4. Batch dispatch configuration (legacy path)
 
 `20261104000001` creates `batch_item_dispatch_config` empty and replaces
 `handle_new_batch_item()`, but it **does not create a trigger**. No
 `CREATE TRIGGER` referencing `handle_new_batch_item` exists anywhere in this
-repository, and hosted has no non-internal trigger invoking it. The current
+repository; the 2026-11-24 hosted observation found no non-internal trigger
+invoking it. The current
 batch upload path does not use this function: it writes
 `batch_upload_sessions` / `batch_upload_files`
 (`20250720000003_batch_upload_optimization.sql`) and posts each file to
 `process-receipt` (`src/services/receiptService.ts:1940`). No repo migration
 creates `batches` or `batch_items`.
 
-Hosted does still carry a legacy `process-batch-item` Edge Function
-(`verify_jwt: false`, version 77, last updated 2025-04-16) that is **not tracked
-in this repository** and whose deployed source cannot be retrieved because its
-deployment metadata is missing. Do not redeploy or delete it during this
-cutover, and do not treat it as live: nothing in the repository or hosted
-database invokes it, so it receives no traffic from the current upload path.
+In the 2026-11-24 hosted observation, the legacy `process-batch-item` Edge Function
+had `verify_jwt: false`, version 77, last updated 2025-04-16. It is **not tracked
+in this repository** and its deployed source could not be retrieved because its
+deployment metadata was missing. Do not redeploy or delete it during this
+cutover. At the time, no repository or hosted database invocation was found;
+verify the current state before relying on that observation.
 
-Consequently the empty config table does **not** block existing batch uploads,
-and leaving it empty is safe. Do not point it at a hostname until a trigger is
+If the trigger remains unattached, the empty config table does **not** block
+existing batch uploads, and leaving it empty is safe. Do not point it at a
+hostname until a trigger is
 deliberately attached and the legacy function is reviewed; an asynchronous
 `net.http_post` enqueue is not proof of delivery. If the legacy trigger is ever
 reattached, inserts fail closed with
@@ -189,10 +195,13 @@ fenced correctly.
 
 ## 5a. Billing preferences and reminder compatibility
 
-Do this before step 6 and keep the window open until the frontend cache is
-invalidated.
+For a future rollout, record the constraint and function shapes before pushing,
+and keep the window open through frontend cache invalidation and smoke tests.
+For the 2026-11-25 rollout, the push and frontend deployment already happened;
+cache invalidation remains unverified and both fresh and cached tab tests remain
+incomplete. Verify them rather than treating the ideal sequence as history.
 
-1. Record the hosted constraint shapes before pushing. The restore migration
+1. For a future push, record the hosted constraint shapes beforehand. The restore migration
    drops every `CHECK` on `billing_email_schedule` that references
    `scheduled_for` and a time source, not just the checked-in expression:
 
@@ -217,28 +226,35 @@ invalidated.
    where n.nspname = 'public' and p.proname = 'mark_billing_reminder_sent';
    ```
 
-   The restore replaces the canonical
-   `mark_billing_reminder_sent(uuid,boolean,text)` with explicit
-   `billing_email_status` casts. If the hosted signature differs, stop and
-   inspect before continuing; do not create a second overload blindly.
+   The applied restore replaces the canonical
+   `mark_billing_reminder_sent(uuid,boolean,text)` without explicit
+   `billing_email_status` casts. The observed hosted status column is varchar;
+   the restore's failure-branch `CASE` assigns text. Do not infer enum-schema
+   compatibility from the absence of casts. PR #266 remains open; check any
+   follow-up migration's status and implementation separately. If the hosted
+   signature differs, stop and inspect before continuing; do not create a
+   second overload blindly.
 
-3. Deploy the frontend build in the same window, after the database push, then
-   invalidate the Vercel/CDN cache. The restore keeps the legacy
-   `get_billing_preferences(uuid)` as a self-scoped compatibility alias, so
-   already-open tabs and cached bundles continue to load their own preferences;
-   the new build uses `get_my_billing_preferences()` and quiet-hours fields.
-   Do not remove the legacy alias until the cache window has closed and
-   telemetry shows no legacy calls.
+3. For a future rollout, deploy the frontend build in the same window after the
+   database push, then invalidate the Vercel/CDN cache. For the 2026-11-25
+   rollout, the frontend was deployed before the push and cache invalidation is
+   unverified. Confirm or perform the authorized invalidation. The restore keeps
+   the legacy `get_billing_preferences(uuid)` as a self-scoped compatibility
+   alias, so already-open tabs and cached bundles can load their own preferences;
+   the new build uses `get_my_billing_preferences()` and quiet-hours fields. Do
+   not remove the legacy alias until the cache window has closed and telemetry
+   shows no legacy calls.
 
-4. Open Settings → Billing in a fresh tab and in an old/cached tab. Both must
-   load preferences; saving must not overwrite stored values with defaults. If
-   the old tab fails with `42501`, stop and verify the alias grant and the
-   authenticated self-scope check before proceeding.
+4. Complete the outstanding smoke tests: open Settings → Billing in a fresh tab
+   and in an old/cached tab. Both must load preferences; saving must not
+   overwrite stored values with defaults. If the old tab fails with `42501`,
+   stop and verify the alias grant and the authenticated self-scope check before
+   proceeding.
 
 5. Confirm the legacy billing RPCs are no longer callable by browser roles.
    `20261103000000_restore_billing_schema_drift.sql` revokes `PUBLIC`, `anon`
    and `authenticated` execute on every overload of a broad billing RPC list,
-   including four functions that hosted currently exposes: 
+      including four functions observed on hosted before the push:
    `schedule_billing_reminder`, `get_upcoming_renewals`,
    `get_email_delivery_stats`, and `cleanup_old_email_schedules`. Before the
    restore an anonymous caller could queue reminder mail for any user, read
@@ -268,10 +284,13 @@ invalidated.
 
 ## 6. Deploy the functions
 
-Schema alone does not restore the live application contract. The production
-Edge Functions are the 2025-09-02 builds, while the deployed frontend already
-calls `change_plan` and `resume`. After the migration, deploy from the same
-merged commit:
+Schema alone does not establish the deployed application contract. A historical
+pre-push observation found production Edge Functions at 2025-09-02 builds,
+while the deployed frontend already called `change_plan` and `resume`. An Edge
+Function deployment was recorded on 2026-11-25. Check the current deployed
+versions and verify the application behavior; the record is not fresh
+validation. If deployment is still required, deploy from the authorized merged
+commit:
 
 ```bash
 supabase functions deploy stripe-webhook --no-verify-jwt

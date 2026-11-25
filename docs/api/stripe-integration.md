@@ -65,12 +65,15 @@ supabase secrets set \
 ```
 
 The `handle_new_batch_item()` trigger function reads the service-role key from
-Supabase Vault. No trigger currently attaches it (see the migration note below).
-Create a Vault secret named `service_role_key` (lowercase — Vault names are
-case-sensitive) in **Dashboard → Database → Vault**. Hosted currently has an
-uppercase `SERVICE_ROLE_KEY` secret; it does not satisfy the migration's
-lowercase lookup, so create the lowercase one before applying the migration. Do
-not put the key in a migration, a tracked file, or the frontend environment.
+Supabase Vault. No trigger was attached in the historical hosted observation
+(see the migration note below). The Vault credential was already replaced for
+the 2026-11-25 rollout; do not create, replace, or delete an entry as a routine
+post-push step. For an environment where `20261104000001` is still pending,
+verify exactly one lowercase `service_role_key` exists and holds the current
+service-role key; Vault names are case-sensitive, so an uppercase entry does
+not satisfy the lookup. If remediation is needed, use the authorized procedure
+in **Dashboard → Database → Vault**. Do not put the key in a migration, a
+tracked file, or the frontend environment.
 
 Billing Edge Functions use the injected `SUPABASE_SERVICE_ROLE_KEY`. Do not
 replace it with a new-format `sb_secret_...` key: these functions pin
@@ -83,8 +86,18 @@ rejects a non-JWT bearer when JWT verification is enabled. Migrating to
 
 ### 3. Database Migration
 
-Apply the billing restore (`20261103000000_restore_billing_schema_drift.sql`)
-first, then these hardening migrations in order:
+**Rollout status (reported 2026-11-25; not freshly revalidated):** the seven
+original migrations listed in the [production cutover runbook](../runbooks/production-cutover.md),
+including the restore from commit `498f0fa`, were applied on 2026-11-25. The
+follow-up `20261126000000_fix_billing_reminder_enum_compatibility` migration has
+not been deployed; PR #266 remains open. The frontend was deployed before the
+push, and Edge Functions were deployed on 2026-11-25. Cache invalidation is
+unverified and fresh-tab and cached-tab smoke tests remain incomplete. Check the
+remote migration list and review the dry run before any further push.
+
+For another environment where these migrations are pending, apply the billing
+restore (`20261103000000_restore_billing_schema_drift.sql`) first, then the
+hardening migrations in order:
 
 - `supabase/migrations/20261104000000_stripe_production_hardening.sql` — adds
   `billing_interval` / `cancel_at_period_end`, guards billing columns on INSERT
@@ -96,8 +109,9 @@ first, then these hardening migrations in order:
   `handle_new_batch_item()` off the hardcoded credential onto Vault. It requires
   exactly one lowercase `service_role_key` Vault entry and aborts otherwise. It
   creates `public.batch_item_dispatch_config` empty but **does not create a
-  trigger**; no trigger in this repository or on hosted invokes the function,
-  and the current batch upload path (`batch_upload_sessions` /
+  trigger**; no trigger in this repository invokes the function, and the
+  2026-11-24 hosted observation found none attached. The current repository
+  batch upload path (`batch_upload_sessions` /
   `batch_upload_files` plus `process-receipt`) does not use it. Leave the table
   empty unless a trigger is deliberately attached and the legacy
   `process-batch-item` function is reviewed. The table is owned by postgres, has RLS enabled, and
@@ -109,10 +123,10 @@ first, then these hardening migrations in order:
   service-only receipt-usage counter and trigger, and the fenced
   payment/renewal/status/profile RPCs used by the webhook.
 
-Before the first migration: export `payment_history` and reconcile duplicate
-payment intent IDs against Stripe. After it: backfill `billing_interval` from
-Stripe, since the column is NULL until reconciled and the UI cannot otherwise
-report annual subscriptions correctly.
+For a future environment before its first migration: export `payment_history`
+and reconcile duplicate payment intent IDs against Stripe. After applying it,
+reconcile and backfill `billing_interval` from Stripe where needed; a NULL
+interval prevents the UI from reporting annual subscriptions correctly.
 
 #### Verification status
 
@@ -324,10 +338,14 @@ callers.
    - `payment_method.attached`
    - `payment_method.detached`
    - `setup_intent.succeeded`
-5. Deploy the billing functions after the database migration:
+5. For a new rollout, check and deploy any reviewed pending database migrations
+   before deploying the billing functions. For hosted deployment, follow the
+   [production cutover runbook](../runbooks/production-cutover.md), including
+   its migration-list and dry-run checks. The original seven migrations were
+   already applied for the 2026-11-25 rollout. Deploy functions only when their
+   current versions require it:
 
    ```bash
-   supabase db push
    supabase functions deploy stripe-webhook --no-verify-jwt
    supabase functions deploy create-checkout-session manage-subscription
    ```
