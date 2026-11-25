@@ -74,7 +74,65 @@ DECLARE
   retry_id uuid;
   tracking_id uuid;
   reminder record;
+  batch_result jsonb;
+  scheduled_id uuid;
 BEGIN
+  IF (SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+      WHERE n.nspname = 'public' AND p.proname = 'schedule_billing_reminder') <> 1 THEN
+    RAISE EXCEPTION 'reminder scheduler must expose exactly one signature';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public' AND p.proname IN (
+      'schedule_billing_reminder', 'schedule_multiple_billing_reminders', 'mark_billing_reminder_sent'
+    ) AND (EXISTS (
+          SELECT 1 FROM aclexplode(COALESCE(p.proacl, acldefault('f', p.proowner))) acl
+          WHERE acl.grantee = 0 AND acl.privilege_type = 'EXECUTE'
+        ) OR has_function_privilege('anon', p.oid, 'EXECUTE')
+        OR has_function_privilege('authenticated', p.oid, 'EXECUTE')
+        OR NOT has_function_privilege('service_role', p.oid, 'EXECUTE'))
+  ) THEN
+    RAISE EXCEPTION 'reminder RPC grants must remain service-only';
+  END IF;
+  scheduled_id := public.schedule_billing_reminder(
+    p_user_id => '25100000-0000-4000-8000-000000000001',
+    p_subscription_id => 'sub_single_test',
+    p_reminder_type => 'upcoming_renewal',
+    p_scheduled_for => now() + interval '1 day'
+  );
+  IF NOT EXISTS (SELECT 1 FROM public.billing_email_schedule WHERE id = scheduled_id AND subscription_id = 'sub_single_test') THEN
+    RAISE EXCEPTION 'named reminder scheduling failed';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM pg_attribute a JOIN pg_type t ON t.oid = a.atttypid
+    WHERE a.attrelid = 'public.billing_email_schedule'::regclass
+      AND a.attname = 'reminder_type' AND t.typtype = 'e'
+  ) THEN
+    IF NOT EXISTS (SELECT 1 FROM public.billing_audit_trail
+      WHERE event_type = 'email_reminder_scheduled' AND new_values->>'schedule_id' = scheduled_id::text) THEN
+      RAISE EXCEPTION 'enum scheduler must audit scheduled reminders';
+    END IF;
+    INSERT INTO public.billing_preferences (user_id, billing_email_enabled)
+    VALUES ('25100000-0000-4000-8000-000000000002', false);
+    IF public.schedule_billing_reminder(
+      p_user_id => '25100000-0000-4000-8000-000000000002',
+      p_subscription_id => 'sub_disabled_test',
+      p_reminder_type => 'upcoming_renewal',
+      p_scheduled_for => now() + interval '1 day'
+    ) IS NOT NULL OR EXISTS (
+      SELECT 1 FROM public.billing_email_schedule WHERE subscription_id = 'sub_disabled_test'
+    ) THEN
+      RAISE EXCEPTION 'enum scheduler must respect disabled billing emails';
+    END IF;
+  END IF;
+  batch_result := public.schedule_multiple_billing_reminders(ARRAY[
+    jsonb_build_object('user_id', '25100000-0000-4000-8000-000000000001', 'subscription_id', 'sub_batch_test', 'reminder_type', 'upcoming_renewal', 'scheduled_for', now() + interval '1 day')
+  ]);
+  IF (batch_result->>'scheduled')::integer IS DISTINCT FROM 1 OR
+     (batch_result->>'errors')::integer IS DISTINCT FROM 0 OR
+     NOT EXISTS (SELECT 1 FROM public.billing_email_schedule WHERE subscription_id = 'sub_batch_test') THEN
+    RAISE EXCEPTION 'batch reminder scheduling failed: %', batch_result;
+  END IF;
   IF has_function_privilege('anon', 'public.get_my_billing_preferences()', 'EXECUTE')
      OR has_function_privilege('anon', 'public.get_billing_preferences(uuid)', 'EXECUTE')
      OR NOT has_function_privilege('authenticated', 'public.get_billing_preferences(uuid)', 'EXECUTE') THEN
@@ -162,6 +220,11 @@ BEGIN
     WHERE schedule_id = '25100000-0000-4000-8000-000000000004'
   ) THEN
     RAISE EXCEPTION 'exhausted failure must be terminal and no longer pending';
+  END IF;
+  IF (SELECT count(*) FROM public.billing_audit_trail
+      WHERE event_type = 'billing_reminder_failed'
+        AND new_values->>'schedule_id' = '25100000-0000-4000-8000-000000000004') <> 2 THEN
+    RAISE EXCEPTION 'both failed delivery attempts must be audited';
   END IF;
   BEGIN
     INSERT INTO public.billing_email_schedule (user_id, reminder_type, scheduled_for)

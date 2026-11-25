@@ -360,9 +360,13 @@ jobs:
   # migrations, runs the suites, then runs two-session race checks on two real
   # connections. It never contacts a hosted project or uses a repository secret.
   sql-regression:
-    name: Stripe SQL Regression
+    name: Stripe SQL Regression (${{ matrix.billing_shape }})
     runs-on: ubuntu-latest
     needs: validate
+    strategy:
+      fail-fast: false
+      matrix:
+        billing_shape: [enum, varchar]
     timeout-minutes: 20
     permissions:
       contents: read
@@ -376,13 +380,14 @@ jobs:
       - name: Run disposable PostgreSQL suites and two-session races
         env:
           PR234_SQL_LOG_DIR: ${{ runner.temp }}/pr234-sql-regression
+          PR234_BILLING_SCHEMA_SHAPE: ${{ matrix.billing_shape }}
         run: bash .github/sql-regression/run-sql-regression.sh
 
       - name: Upload SQL regression logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: pr234-sql-regression-${{ github.run_id }}-${{ github.run_attempt }}
+          name: pr234-sql-regression-${{ matrix.billing_shape }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/pr234-sql-regression
           if-no-files-found: error
 
