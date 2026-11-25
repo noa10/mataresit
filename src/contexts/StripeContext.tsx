@@ -107,8 +107,14 @@ export const StripeProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [lastRefreshTime, setLastRefreshTime] = useState<Date | null>(null);
   const requestSequence = useRef(0);
   // Keying the state by owner makes a response for a previous account
-  // unreadable instead of merely overwritten.
-  const subscriptionData = subscriptionState?.userId === userId ? subscriptionState.data : null;
+  // unreadable instead of merely overwritten. The explicit null check is
+  // load-bearing: while auth is still resolving, userId is undefined and
+  // `subscriptionState?.userId === userId` would compare undefined to
+  // undefined and then dereference the null state.
+  const subscriptionData =
+    subscriptionState !== null && subscriptionState.userId === userId
+      ? subscriptionState.data
+      : null;
 
   // One idempotency key per billing intent, reused across retries of the same
   // request. The key is dropped once the server answers a success or a 4xx
