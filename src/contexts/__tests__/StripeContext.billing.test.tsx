@@ -41,6 +41,17 @@ describe('Stripe subscription availability', () => {
     expect(screen.queryByText('free')).toBeNull();
   });
 
+  it('renders while auth is still resolving', () => {
+    // Before auth resolves userId is undefined, and the null subscription
+    // state has an undefined optional userId. Comparing those two must not
+    // count as a match, or the provider dereferences null during first
+    // render and takes the whole app down with it.
+    mocks.user = null;
+    mocks.query.mockResolvedValue({ data: null, error: { code: 'PGRST116' } });
+    render(<StripeProvider><Consumer /></StripeProvider>);
+    expect(screen.getByText('unavailable')).toBeTruthy();
+  });
+
   it('does not expose a previous account or accept its late response', async () => {
     let resolveFirst: (value: unknown) => void;
     mocks.query.mockImplementationOnce(() => new Promise(resolve => { resolveFirst = resolve; })).mockResolvedValueOnce({ data: null, error: { code: '42703' } });
