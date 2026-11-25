@@ -142,8 +142,10 @@ export const StripeProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (!userId) return null;
     const sequence = ++requestSequence.current;
     const isCurrent = () => sequence === requestSequence.current;
-    setSubscriptionState(null);
-    setLastRefreshTime(null);
+    // Deliberately does NOT clear the last known subscription. Clearing here
+    // would gate a paying account as free for the whole fetch and, if the fetch
+    // failed, for the rest of the session — a network blip would cost a Max
+    // user their entitlements. Only a definitive "no such row" answer clears.
     setSubscriptionLoading(true);
 
     try {
@@ -154,11 +156,20 @@ export const StripeProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         .single()
         .overrideTypes<ProfileSubscriptionRow, { merge: false }>();
 
+      if (!isCurrent()) return null;
+
       if (error || !profile) {
         console.error('StripeContext: Error fetching subscription data:', error);
+        // PGRST116 is PostgREST's "no rows returned": the account genuinely has
+        // no subscription record, so keeping a stale value would be a lie.
+        // Anything else is transport or server trouble, where the last known
+        // value is the best available truth.
+        if (error?.code === 'PGRST116') {
+          setSubscriptionState(null);
+          setLastRefreshTime(null);
+        }
         return null;
       }
-      if (!isCurrent()) return null;
 
       const data = toSubscriptionData(profile);
       setSubscriptionState({ userId, data });

@@ -16,12 +16,22 @@ const profile = { subscription_tier: 'pro', subscription_status: 'active', billi
 describe('Stripe subscription availability', () => {
   beforeEach(() => { mocks.user = { id: 'one' }; mocks.query.mockReset(); });
 
-  it('clears previously loaded data after a failed refresh', async () => {
+  it('keeps the last known subscription when a refresh fails', async () => {
     mocks.query.mockResolvedValueOnce({ data: profile, error: null }).mockResolvedValueOnce({ data: null, error: { code: '42703' } });
     render(<StripeProvider><Consumer /></StripeProvider>);
     await screen.findByText('pro');
     await act(async () => { screen.getByText('refresh').click(); });
-    expect(screen.getByText('unavailable')).toBeTruthy();
+    // A failed refresh must not cost a paying account its entitlements; the
+    // last known value stays until a definitive answer replaces it.
+    expect(screen.getByText('pro')).toBeTruthy();
+  });
+
+  it('clears previously loaded data once the account has no profile row', async () => {
+    mocks.query.mockResolvedValueOnce({ data: profile, error: null }).mockResolvedValueOnce({ data: null, error: { code: 'PGRST116' } });
+    render(<StripeProvider><Consumer /></StripeProvider>);
+    await screen.findByText('pro');
+    await act(async () => { screen.getByText('refresh').click(); });
+    await waitFor(() => expect(screen.getByText('unavailable')).toBeTruthy());
   });
 
   it('does not treat a missing profile as an active free subscription', async () => {
