@@ -7,6 +7,7 @@ import {
   SubscriptionExpiryEmailData,
   PaymentConfirmationEmailData
 } from './templates.ts';
+import { escapeHtml } from '../_shared/html-escape.ts';
 
 /**
  * Generate subscription expiry email
@@ -31,7 +32,7 @@ export function generateSubscriptionExpiryEmail(data: SubscriptionExpiryEmailDat
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${subject}</title>
+  <title>${escapeHtml(subject)}</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f5f5f5; }
     .container { max-width: 600px; margin: 0 auto; background-color: white; }
@@ -55,8 +56,8 @@ export function generateSubscriptionExpiryEmail(data: SubscriptionExpiryEmailDat
       <h1>${isInGracePeriod ? '⏰ Grace Period Active' : '⚠️ Subscription Expired'}</h1>
     </div>
     <div class="content">
-      <h2>Hi ${data.recipientName},</h2>
-      
+      <h2>Hi ${escapeHtml(data.recipientName)},</h2>
+
       ${isInGracePeriod ? `
       <div class="alert-warning">
         <h3>Your subscription is in grace period</h3>
@@ -232,7 +233,7 @@ export function generatePaymentConfirmationEmail(data: PaymentConfirmationEmailD
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${subject}</title>
+  <title>${escapeHtml(subject)}</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f5f5f5; }
     .container { max-width: 600px; margin: 0 auto; background-color: white; }
@@ -255,8 +256,8 @@ export function generatePaymentConfirmationEmail(data: PaymentConfirmationEmailD
       <h1>✅ Payment Successful</h1>
     </div>
     <div class="content">
-      <h2>Hi ${data.recipientName},</h2>
-      
+      <h2>Hi ${escapeHtml(data.recipientName)},</h2>
+
       <div class="success-alert">
         <h3>🎉 Thank you for your payment!</h3>
         <p>Your payment has been successfully processed and your Mataresit ${tierName} subscription is now active.</p>

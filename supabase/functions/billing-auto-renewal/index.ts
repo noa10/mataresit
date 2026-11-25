@@ -4,6 +4,7 @@ import Stripe from "https://esm.sh/stripe@14.21.0";
 import { getFrontendUrl } from "../_shared/site-url.ts";
 import { getServiceRoleKey } from '../_shared/service-role.ts';
 import { isPrivileged, isSelf, resolveCaller } from '../_shared/function-auth.ts';
+import { deriveDisplayName } from '../_shared/profile-name.ts';
 
 // Initialize Supabase client
 const supabaseClient = createClient(
@@ -535,7 +536,7 @@ async function updateAutoRenewalSettings(userId: string, settings: any) {
         retry_interval_hours,
         grace_period_days,
         updated_at: new Date().toISOString()
-      });
+      }, { onConflict: 'user_id' });
 
     if (error) {
       throw new Error(`Failed to update billing preferences: ${error.message}`);
@@ -768,7 +769,7 @@ async function scheduleReminderEmail(renewal: any, daysUntilRenewal: number) {
   // Get user profile for email details
   const { data: profile, error } = await supabaseClient
     .from('profiles')
-    .select('email, full_name')
+    .select('email, first_name, last_name')
     .eq('id', renewal.user_id)
     .single();
 
@@ -787,7 +788,7 @@ async function scheduleReminderEmail(renewal: any, daysUntilRenewal: number) {
     p_reminder_type: 'upcoming_renewal',
     p_scheduled_for: new Date().toISOString(), // Send immediately
     p_template_data: {
-      recipientName: profile.full_name || profile.email,
+      recipientName: deriveDisplayName(profile),
       recipientEmail: profile.email,
       subscriptionTier: renewal.current_tier,
       renewalDate: renewal.next_renewal_date,
@@ -823,7 +824,7 @@ async function schedulePaymentFailedEmail(profile: any, attemptNumber: number, m
     p_reminder_type: 'payment_failed',
     p_scheduled_for: new Date().toISOString(),
     p_template_data: {
-      recipientName: profile.full_name || profile.email,
+      recipientName: deriveDisplayName(profile),
       recipientEmail: profile.email,
       subscriptionTier: profile.subscription_tier,
       amount: 0, // Will be filled from invoice data
@@ -857,7 +858,7 @@ async function scheduleGracePeriodEmail(profile: any, gracePeriodEnd: Date) {
     p_reminder_type: 'grace_period_warning',
     p_scheduled_for: new Date().toISOString(),
     p_template_data: {
-      recipientName: profile.full_name || profile.email,
+      recipientName: deriveDisplayName(profile),
       recipientEmail: profile.email,
       subscriptionTier: profile.subscription_tier,
       gracePeriodEndDate: gracePeriodEnd.toISOString(),
@@ -882,7 +883,7 @@ async function scheduleSubscriptionExpiryEmail(profile: any) {
     p_reminder_type: 'subscription_expiry',
     p_scheduled_for: new Date().toISOString(),
     p_template_data: {
-      recipientName: profile.full_name || profile.email,
+      recipientName: deriveDisplayName(profile),
       recipientEmail: profile.email,
       subscriptionTier: profile.subscription_tier,
       expiryDate: profile.subscription_end_date || new Date().toISOString(),

@@ -534,6 +534,9 @@
     }
   },
   "billingPreferences": {
+    "subscriptionLoading": "Loading subscription details…",
+    "subscriptionUnavailable": "Subscription details are unavailable. Please try again.",
+    "subscriptionRetry": "Try again",
     "title": "Billing Preferences",
     "description": "Manage your subscription, payment methods, and billing notifications.",
     "tabs": {

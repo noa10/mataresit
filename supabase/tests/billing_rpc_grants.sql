@@ -1,14 +1,16 @@
 -- Billing RPC grant regression for
--- 20261124000000_revoke_legacy_billing_rpc_grants.sql.
+-- 20261103000000_restore_billing_schema_drift.sql and
+-- 20261126020000_revoke_legacy_billing_preferences_rpc.sql.
 --
 -- Run after the curated migration chain in .github/sql-regression, or on any
--- nonproduction schema that has applied that migration. Read-only: it asserts
+-- nonproduction schema that has applied those migrations. Read-only: it asserts
 -- catalog state and never mutates rows.
 --
 -- It proves:
---   1. the four legacy billing RPCs are not executable by anon/authenticated,
+--   1. the closed billing RPCs are not executable by anon or authenticated,
 --   2. service_role keeps execute so the Edge Functions still work,
---   3. no other public SECURITY DEFINER billing RPC is left with a PUBLIC grant.
+--   3. no other public SECURITY DEFINER billing RPC is left reachable by a
+--      browser role, including through a PUBLIC grant.
 --
 -- The self-scoped preference read paths (get_my_billing_preferences and the
 -- legacy get_billing_preferences alias) are 20261103000000's contract and are
@@ -19,7 +21,10 @@ DECLARE
   r RECORD;
   offenders TEXT := '';
 BEGIN
-  -- 1 + 2: the four names closed by the migration.
+  -- 1 + 2: the names closed by the migrations. mark_billing_reminder_sent is
+  -- included because it is an unscoped writer taking an arbitrary schedule id;
+  -- a browser grant on it would let any signed-in user mark another user's
+  -- reminder as sent.
   FOR r IN
     SELECT p.oid::regprocedure::text AS signature,
            has_function_privilege('anon', p.oid, 'EXECUTE') AS anon,
@@ -32,7 +37,9 @@ BEGIN
         'schedule_billing_reminder',
         'get_upcoming_renewals',
         'get_email_delivery_stats',
-        'cleanup_old_email_schedules'
+        'cleanup_old_email_schedules',
+        'mark_billing_reminder_sent',
+        'update_billing_preferences'
       )
   LOOP
     IF r.anon OR r.authenticated THEN
@@ -44,8 +51,10 @@ BEGIN
   END LOOP;
 
   -- 3: belt and braces — no billing-named SECURITY DEFINER function should
-  -- still carry a PUBLIC grant (grantee 0) or an anon grant, apart from the
-  -- explicitly self-scoped read paths checked above.
+  -- still be reachable by a browser role, whether through a direct anon or
+  -- authenticated grant or through a PUBLIC grant (grantee 0). The explicitly
+  -- self-scoped read paths are excluded because they are supposed to be
+  -- authenticated-executable.
   FOR r IN
     SELECT p.oid::regprocedure::text AS signature
     FROM pg_proc p
@@ -53,14 +62,14 @@ BEGIN
     WHERE n.nspname = 'public'
       AND p.prosecdef
       AND (p.proname ILIKE '%billing%' OR p.proname ILIKE '%renewal%'
-           OR p.proname ILIKE '%email_schedule%')
+           OR p.proname ILIKE '%email_schedule%' OR p.proname ILIKE '%preferences%')
       AND p.proname NOT IN (
         'get_my_billing_preferences',
-        'get_billing_preferences',
-        'mark_billing_reminder_sent'
+        'get_billing_preferences'
       )
       AND (
         has_function_privilege('anon', p.oid, 'EXECUTE')
+        OR has_function_privilege('authenticated', p.oid, 'EXECUTE')
         OR EXISTS (
           SELECT 1
           FROM aclexplode(COALESCE(p.proacl, acldefault('f', p.proowner))) acl
@@ -68,7 +77,7 @@ BEGIN
         )
       )
   LOOP
-    offenders := offenders || r.signature || ' (public/anon SECURITY DEFINER) ';
+    offenders := offenders || r.signature || ' (browser-reachable SECURITY DEFINER) ';
   END LOOP;
 
   IF offenders <> '' THEN

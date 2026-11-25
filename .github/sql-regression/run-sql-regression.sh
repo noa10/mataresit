@@ -38,6 +38,7 @@ suite_list=(
   billing_schema_restore
   batch_item_dispatch_config
   billing_rpc_grants
+  billing_preferences_rpc_revoke
 )
 
 # The backend that owns the suites. This is intentionally an explicit list:
@@ -54,6 +55,8 @@ curated_migrations=(
   20261106000000_stripe_checkout_locks_and_payment_fencing.sql
   20261110010000_stripe_fencing_regressions.sql
   20261126000000_fix_billing_reminder_enum_compatibility.sql
+  20261126010000_restore_profile_billing_columns.sql
+  20261126020000_revoke_legacy_billing_preferences_rpc.sql
 )
 
 mkdir -p "$log_dir"
@@ -197,7 +200,17 @@ ALTER FUNCTION public.schedule_billing_reminder_fixture_original(uuid, text, pub
   RENAME TO schedule_billing_reminder;
 SQL
     fi
+    if [[ "$migration" == "20261126010000_restore_profile_billing_columns.sql" && "$billing_shape" == "varchar" ]]; then
+      # Prove the drift fixture reproduces the production failure before the
+      # restore runs; the protection suite proves it is gone afterwards.
+      run_file "reproduce profile billing drift" "${scripts_dir}/profile-billing-drift-reproduction.sql"
+    fi
     run_file "$migration" "${migrations_dir}/${migration}"
+    if [[ "$migration" == "20261126010000_restore_profile_billing_columns.sql" ]]; then
+      # Idempotency: the migration is a no-op on the fresh/enum shape and must
+      # not replace the enum or the existing defaults when replayed.
+      run_file "replay profile billing column restore" "${migrations_dir}/${migration}"
+    fi
     if [[ "$migration" == "20261126000000_fix_billing_reminder_enum_compatibility.sql" ]]; then
       run_file "replay billing reminder enum repair" "${migrations_dir}/${migration}"
     fi
@@ -222,7 +235,14 @@ for suite in "${suite_list[@]}"; do
     continue
   fi
   echo "=== ${suite} ===" | tee -a "${log_dir}/${suite}.log"
-  if psql_exec -f - < "$file" >> "${log_dir}/${suite}.log" 2>&1; then
+  suite_args=()
+  if [[ "$suite" == "billing_preferences_rpc_revoke" ]]; then
+    # The suite replays the actual migration via psql's include command.
+    docker cp "${migrations_dir}/20261126020000_revoke_legacy_billing_preferences_rpc.sql" \
+      "${container}:/tmp/pr234-billing-preferences-revoke-migration.sql"
+    suite_args=(-v billing_revoke_migration=/tmp/pr234-billing-preferences-revoke-migration.sql)
+  fi
+  if psql_exec ${suite_args[@]+"${suite_args[@]}"} -f - < "$file" >> "${log_dir}/${suite}.log" 2>&1; then
     printf '%s\t%s\t%s\n' "$suite" "0" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$summary"
   else
     printf '%s\t%s\t%s\n' "$suite" "1" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$summary"

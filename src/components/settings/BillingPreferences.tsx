@@ -113,7 +113,7 @@ interface SubscriptionHealth {
 export function BillingPreferences() {
   const { t } = useSettingsTranslation();
   const { user } = useAuth();
-  const { subscriptionData, createPortalSession, isLoading: stripeLoading } = useStripe();
+  const { subscriptionData, subscriptionLoading, createPortalSession, refreshSubscription, isLoading: stripeLoading } = useStripe();
 
   const [preferences, setPreferences] = useState<BillingPreferencesData>({
     auto_renewal_enabled: true,
@@ -306,6 +306,15 @@ export function BillingPreferences() {
       default: return <Info className="h-4 w-4" />;
     }
   };
+
+  if (!subscriptionData) {
+    return (
+      <div role="status" className="space-y-3">
+        <p>{t(subscriptionLoading ? 'billingPreferences.subscriptionLoading' : 'billingPreferences.subscriptionUnavailable')}</p>
+        {!subscriptionLoading && <Button variant="outline" onClick={() => void refreshSubscription()}>{t('billingPreferences.subscriptionRetry')}</Button>}
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (

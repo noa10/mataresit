@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 import { getServiceRoleKey } from '../_shared/service-role.ts';
 import { isPrivileged, isSelf, resolveCaller } from '../_shared/function-auth.ts';
+import { deriveDisplayName } from '../_shared/profile-name.ts';
 
 // Initialize Supabase client
 const supabaseClient = createClient(
@@ -101,7 +102,7 @@ async function scheduleBillingReminders(params: any) {
         // Get user profile and billing preferences
         const { data: profile, error: profileError } = await supabaseClient
           .from('profiles')
-          .select('id, email, full_name, stripe_subscription_id')
+          .select('id, email, first_name, last_name, stripe_subscription_id')
           .eq('id', userId)
           .single();
 
@@ -141,7 +142,7 @@ async function scheduleBillingReminders(params: any) {
           p_scheduled_for: optimalSendTime,
           p_template_data: {
             ...templateData,
-            recipientName: profile.full_name || profile.email,
+            recipientName: deriveDisplayName(profile),
             recipientEmail: profile.email
           },
           p_language: prefs.preferred_language
@@ -588,7 +589,7 @@ async function updateEmailPreferences(params: any) {
         quiet_hours_start: preferences.quiet_hours_start,
         quiet_hours_end: preferences.quiet_hours_end,
         updated_at: new Date().toISOString()
-      });
+      }, { onConflict: 'user_id' });
 
     if (error) {
       throw new Error(`Failed to update preferences: ${error.message}`);

@@ -540,6 +540,9 @@
       "scanStreakValue_other": "{{count}} hari"
     },
     "settings": {
+      "subscriptionLoading": "Memuatkan butiran langganan…",
+      "subscriptionUnavailable": "Butiran langganan tidak tersedia. Sila cuba lagi.",
+      "subscriptionRetry": "Cuba lagi",
       "eyebrow": "Akaun",
       "title": "Tetapan",
       "lede": "Keutamaan, penggunaan pelan, kunci API — semua kawalan ruang kerja di satu tempat.",

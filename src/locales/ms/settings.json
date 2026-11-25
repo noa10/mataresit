@@ -534,6 +534,9 @@
     }
   },
   "billingPreferences": {
+    "subscriptionLoading": "Memuatkan butiran langganan…",
+    "subscriptionUnavailable": "Butiran langganan tidak tersedia. Sila cuba lagi.",
+    "subscriptionRetry": "Cuba lagi",
     "title": "Keutamaan Pengebilan",
     "description": "Urus langganan, kaedah pembayaran dan pemberitahuan pengebilan anda.",
     "tabs": {

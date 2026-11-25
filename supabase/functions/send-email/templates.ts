@@ -1,6 +1,7 @@
 // Email Templates for Team Collaboration Features
 
 import { getFrontendUrl } from '../_shared/site-url.ts';
+import { escapeHtml } from '../_shared/html-escape.ts';
 
 export interface TeamInvitationEmailData {
   inviteeEmail: string;
@@ -179,12 +180,12 @@ export function generateTeamInvitationEmail(data: TeamInvitationEmailData): { su
       <div class="container">
         <div class="header">
           <h1>🎉 You're Invited!</h1>
-          <p>Join ${data.teamName} on Mataresit</p>
+          <p>Join ${escapeHtml(data.teamName)} on Mataresit</p>
         </div>
         <div class="content">
           <p>Hi there!</p>
           
-          <p><strong>${data.inviterName}</strong> has invited you to join <strong>${data.teamName}</strong> on Mataresit as a <span class="role-badge">${data.role}</span>.</p>
+          <p><strong>${escapeHtml(data.inviterName)}</strong> has invited you to join <strong>${escapeHtml(data.teamName)}</strong> on Mataresit as a <span class="role-badge">${escapeHtml(data.role)}</span>.</p>
 
           <p>Mataresit is a powerful receipt management and expense tracking platform that helps teams collaborate on financial data and streamline their expense workflows.</p>
 
@@ -214,7 +215,7 @@ export function generateTeamInvitationEmail(data: TeamInvitationEmailData): { su
             minute: '2-digit'
           })}.</small></p>
           
-          <p>If you have any questions, feel free to reach out to ${data.inviterName} or our support team.</p>
+          <p>If you have any questions, feel free to reach out to ${escapeHtml(data.inviterName)} or our support team.</p>
           
           <p>Welcome to the team!</p>
         </div>
@@ -306,7 +307,7 @@ export function generateClaimNotificationEmail(data: ClaimNotificationEmailData)
       <div class="container">
         <div class="header">
           <h1>💼 Claim Update</h1>
-          <p>${data.teamName}</p>
+          <p>${escapeHtml(data.teamName)}</p>
         </div>
         <div class="content">
           <p>${statusMessage}</p>
@@ -315,7 +316,7 @@ export function generateClaimNotificationEmail(data: ClaimNotificationEmailData)
             <h3>${data.claimTitle}</h3>
             <p><strong>Amount:</strong> <span class="amount">${data.currency} ${data.claimAmount.toFixed(2)}</span></p>
             <p><strong>Submitted by:</strong> ${data.claimantName}</p>
-            <p><strong>Team:</strong> ${data.teamName}</p>
+            <p><strong>Team:</strong> ${escapeHtml(data.teamName)}</p>
             ${data.rejectionReason ? `<p><strong>Rejection Reason:</strong> ${data.rejectionReason}</p>` : ''}
           </div>
           
@@ -409,7 +410,7 @@ export function generateReceiptProcessingEmail(data: ReceiptProcessingEmailData)
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${subject}</title>
+  <title>${escapeHtml(subject)}</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f8fafc; }
     .container { max-width: 600px; margin: 0 auto; background-color: white; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); }
@@ -434,7 +435,7 @@ export function generateReceiptProcessingEmail(data: ReceiptProcessingEmailData)
       <h1>${statusInfo.title}</h1>
     </div>
     <div class="content">
-      <p>Hi ${data.recipientName},</p>
+      <p>Hi ${escapeHtml(data.recipientName)},</p>
 
       <p>${statusInfo.message}</p>
 
@@ -443,7 +444,7 @@ export function generateReceiptProcessingEmail(data: ReceiptProcessingEmailData)
         <p><strong>Receipt ID:</strong> ${data.receiptId}</p>
         ${data.merchant ? `<p><strong>Merchant:</strong> ${data.merchant}</p>` : ''}
         ${data.total ? `<p><strong>Amount:</strong> ${data.currency || 'MYR'} ${data.total}</p>` : ''}
-        ${data.teamName ? `<p><strong>Team:</strong> ${data.teamName}</p>` : ''}
+        ${data.teamName ? `<p><strong>Team:</strong> ${escapeHtml(data.teamName)}</p>` : ''}
       </div>
 
       <a href="${data.actionUrl}" class="cta-button">${statusInfo.action}</a>
@@ -525,7 +526,7 @@ export function generateBatchProcessingEmail(data: BatchProcessingEmailData): { 
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${subject}</title>
+  <title>${escapeHtml(subject)}</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f8fafc; }
     .container { max-width: 600px; margin: 0 auto; background-color: white; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); }
@@ -554,7 +555,7 @@ export function generateBatchProcessingEmail(data: BatchProcessingEmailData): { 
       <h1>${title}</h1>
     </div>
     <div class="content">
-      <p>Hi ${data.recipientName},</p>
+      <p>Hi ${escapeHtml(data.recipientName)},</p>
 
       <p>${message}</p>
 
@@ -573,7 +574,7 @@ export function generateBatchProcessingEmail(data: BatchProcessingEmailData): { 
         </div>
       </div>
 
-      ${data.teamName ? `<p><strong>Team:</strong> ${data.teamName}</p>` : ''}
+      ${data.teamName ? `<p><strong>Team:</strong> ${escapeHtml(data.teamName)}</p>` : ''}
 
       <a href="${data.actionUrl}" class="cta-button">View Dashboard</a>
 
@@ -674,7 +675,7 @@ export function generateTeamCollaborationEmail(data: TeamCollaborationEmailData)
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${subject}</title>
+  <title>${escapeHtml(subject)}</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f8fafc; }
     .container { max-width: 600px; margin: 0 auto; background-color: white; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); }
@@ -697,10 +698,10 @@ export function generateTeamCollaborationEmail(data: TeamCollaborationEmailData)
   <div class="container">
     <div class="header">
       <h1>${actionInfo.title}</h1>
-      <span class="team-badge">${data.teamName}</span>
+      <span class="team-badge">${escapeHtml(data.teamName)}</span>
     </div>
     <div class="content">
-      <p>Hi ${data.recipientName},</p>
+      <p>Hi ${escapeHtml(data.recipientName)},</p>
 
       <p>${actionInfo.message}</p>
 
@@ -712,7 +713,7 @@ export function generateTeamCollaborationEmail(data: TeamCollaborationEmailData)
         <h3>Receipt Details</h3>
         <p><strong>Receipt ID:</strong> ${data.receiptId}</p>
         ${data.merchant ? `<p><strong>Merchant:</strong> ${data.merchant}</p>` : ''}
-        <p><strong>Team:</strong> ${data.teamName}</p>
+        <p><strong>Team:</strong> ${escapeHtml(data.teamName)}</p>
         <p><strong>Action by:</strong> ${data.actorName}</p>
       </div>
 
@@ -781,7 +782,7 @@ export function generateTeamMemberRemovedEmail(data: TeamMemberRemovedEmailData)
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${subject}</title>
+  <title>${escapeHtml(subject)}</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f5f5f5; }
     .container { max-width: 600px; margin: 0 auto; background-color: white; }
@@ -803,17 +804,17 @@ export function generateTeamMemberRemovedEmail(data: TeamMemberRemovedEmailData)
       <h1>Team Membership Update</h1>
     </div>
     <div class="content">
-      <p>Dear ${data.removedUserName},</p>
+      <p>Dear ${escapeHtml(data.removedUserName)},</p>
 
-      <p>We're writing to inform you that you have been removed from the team <strong>"${data.teamName}"</strong> on Mataresit.</p>
+      <p>We're writing to inform you that you have been removed from the team <strong>"${escapeHtml(data.teamName)}"</strong> on Mataresit.</p>
 
       <div class="removal-info">
         <h3>Removal Details</h3>
-        <p><strong>Team:</strong> ${data.teamName}</p>
-        <p><strong>Removed by:</strong> ${data.removedByUserName}</p>
+        <p><strong>Team:</strong> ${escapeHtml(data.teamName)}</p>
+        <p><strong>Removed by:</strong> ${escapeHtml(data.removedByUserName)}</p>
         <p><strong>Date & Time:</strong> ${data.removalTimestamp}</p>
-        ${data.removalReason ? `<p><strong>Reason:</strong> ${data.removalReason}</p>` : ''}
-        ${data.transferredToUserName ? `<p><strong>Data transferred to:</strong> ${data.transferredToUserName}</p>` : ''}
+        ${data.removalReason ? `<p><strong>Reason:</strong> ${escapeHtml(data.removalReason)}</p>` : ''}
+        ${data.transferredToUserName ? `<p><strong>Data transferred to:</strong> ${escapeHtml(data.transferredToUserName)}</p>` : ''}
       </div>
 
       <p>As a result of this change:</p>
@@ -821,14 +822,14 @@ export function generateTeamMemberRemovedEmail(data: TeamMemberRemovedEmailData)
         <li>You no longer have access to the team's receipts and data</li>
         <li>You cannot submit new expense claims to this team</li>
         <li>You will not receive further notifications from this team</li>
-        ${data.transferredToUserName ? `<li>Your previous contributions have been transferred to ${data.transferredToUserName}</li>` : ''}
+        ${data.transferredToUserName ? `<li>Your previous contributions have been transferred to ${escapeHtml(data.transferredToUserName)}</li>` : ''}
       </ul>
 
       <div class="contact-info">
         <h3>Questions or Concerns?</h3>
         <p>If you have any questions about this removal or believe this was done in error, please contact:</p>
-        <p><strong>${data.removedByUserName}</strong><br>
-        Email: <a href="mailto:${data.removedByUserEmail}">${data.removedByUserEmail}</a></p>
+        <p><strong>${escapeHtml(data.removedByUserName)}</strong><br>
+        Email: <a href="mailto:${escapeHtml(data.removedByUserEmail)}">${escapeHtml(data.removedByUserEmail)}</a></p>
         <p>You can also reach out to our support team if you need assistance.</p>
       </div>
 
@@ -928,12 +929,12 @@ function generateTeamInvitationEmailMalay(data: TeamInvitationEmailData): { subj
       <div class="container">
         <div class="header">
           <h1>🎉 Anda Dijemput!</h1>
-          <p>Sertai ${data.teamName} di Mataresit</p>
+          <p>Sertai ${escapeHtml(data.teamName)} di Mataresit</p>
         </div>
         <div class="content">
           <p>Hai!</p>
 
-          <p><strong>${data.inviterName}</strong> telah menjemput anda untuk menyertai <strong>${data.teamName}</strong> di Mataresit sebagai <span class="role-badge">${data.role}</span>.</p>
+          <p><strong>${escapeHtml(data.inviterName)}</strong> telah menjemput anda untuk menyertai <strong>${escapeHtml(data.teamName)}</strong> di Mataresit sebagai <span class="role-badge">${escapeHtml(data.role)}</span>.</p>
 
           <p>Mataresit adalah platform pengurusan resit dan penjejakan perbelanjaan yang berkuasa yang membantu pasukan bekerjasama dalam data kewangan dan menyelaraskan aliran kerja perbelanjaan mereka.</p>
 
@@ -963,7 +964,7 @@ function generateTeamInvitationEmailMalay(data: TeamInvitationEmailData): { subj
             minute: '2-digit'
           })}.</small></p>
 
-          <p>Jika anda mempunyai sebarang soalan, sila hubungi ${data.inviterName} atau pasukan sokongan kami.</p>
+          <p>Jika anda mempunyai sebarang soalan, sila hubungi ${escapeHtml(data.inviterName)} atau pasukan sokongan kami.</p>
 
           <p>Selamat datang ke pasukan!</p>
         </div>
@@ -1056,7 +1057,7 @@ function generateReceiptProcessingEmailMalay(data: ReceiptProcessingEmailData): 
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${subject}</title>
+  <title>${escapeHtml(subject)}</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f8fafc; }
     .container { max-width: 600px; margin: 0 auto; background-color: white; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); }
@@ -1081,7 +1082,7 @@ function generateReceiptProcessingEmailMalay(data: ReceiptProcessingEmailData): 
       <h1>${statusInfo.title}</h1>
     </div>
     <div class="content">
-      <p>Hai ${data.recipientName},</p>
+      <p>Hai ${escapeHtml(data.recipientName)},</p>
 
       <p>${statusInfo.message}</p>
 
@@ -1090,7 +1091,7 @@ function generateReceiptProcessingEmailMalay(data: ReceiptProcessingEmailData): 
         <p><strong>ID Resit:</strong> ${data.receiptId}</p>
         ${data.merchant ? `<p><strong>Pedagang:</strong> ${data.merchant}</p>` : ''}
         ${data.total ? `<p><strong>Jumlah:</strong> ${data.currency || 'MYR'} ${data.total}</p>` : ''}
-        ${data.teamName ? `<p><strong>Pasukan:</strong> ${data.teamName}</p>` : ''}
+        ${data.teamName ? `<p><strong>Pasukan:</strong> ${escapeHtml(data.teamName)}</p>` : ''}
       </div>
 
       <a href="${data.actionUrl}" class="cta-button">${statusInfo.action}</a>
@@ -1283,7 +1284,7 @@ export function generateBillingReminderEmail(data: BillingReminderEmailData): { 
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${subject}</title>
+  <title>${escapeHtml(subject)}</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f5f5f5; }
     .container { max-width: 600px; margin: 0 auto; background-color: white; }
@@ -1306,7 +1307,7 @@ export function generateBillingReminderEmail(data: BillingReminderEmailData): { 
       <h1>💳 Subscription Renewal Reminder</h1>
     </div>
     <div class="content">
-      <h2>Hi ${data.recipientName},</h2>
+      <h2>Hi ${escapeHtml(data.recipientName)},</h2>
 
       <p>Your Mataresit <strong>${tierName}</strong> subscription is set to renew ${urgencyText}. We wanted to give you a heads up about your upcoming billing.</p>
 
@@ -1435,7 +1436,7 @@ export function generatePaymentFailedEmail(data: PaymentFailedEmailData): { subj
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${subject}</title>
+  <title>${escapeHtml(subject)}</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f5f5f5; }
     .container { max-width: 600px; margin: 0 auto; background-color: white; }
@@ -1459,7 +1460,7 @@ export function generatePaymentFailedEmail(data: PaymentFailedEmailData): { subj
       <h1>❌ Payment Failed</h1>
     </div>
     <div class="content">
-      <h2>Hi ${data.recipientName},</h2>
+      <h2>Hi ${escapeHtml(data.recipientName)},</h2>
 
       ${isLastAttempt ? `
       <div class="alert-error">
@@ -1721,7 +1722,7 @@ function generateTeamMemberRemovedEmailMalay(data: TeamMemberRemovedEmailData): 
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${subject}</title>
+  <title>${escapeHtml(subject)}</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f5f5f5; }
     .container { max-width: 600px; margin: 0 auto; background-color: white; }
@@ -1743,17 +1744,17 @@ function generateTeamMemberRemovedEmailMalay(data: TeamMemberRemovedEmailData): 
       <h1>Kemaskini Keahlian Pasukan</h1>
     </div>
     <div class="content">
-      <p>Yang dihormati ${data.removedUserName},</p>
+      <p>Yang dihormati ${escapeHtml(data.removedUserName)},</p>
 
-      <p>Kami menulis untuk memaklumkan bahawa anda telah dikeluarkan dari pasukan <strong>"${data.teamName}"</strong> di Mataresit.</p>
+      <p>Kami menulis untuk memaklumkan bahawa anda telah dikeluarkan dari pasukan <strong>"${escapeHtml(data.teamName)}"</strong> di Mataresit.</p>
 
       <div class="removal-info">
         <h3>Butiran Penyingkiran</h3>
-        <p><strong>Pasukan:</strong> ${data.teamName}</p>
-        <p><strong>Dikeluarkan oleh:</strong> ${data.removedByUserName}</p>
+        <p><strong>Pasukan:</strong> ${escapeHtml(data.teamName)}</p>
+        <p><strong>Dikeluarkan oleh:</strong> ${escapeHtml(data.removedByUserName)}</p>
         <p><strong>Tarikh & Masa:</strong> ${data.removalTimestamp}</p>
-        ${data.removalReason ? `<p><strong>Sebab:</strong> ${data.removalReason}</p>` : ''}
-        ${data.transferredToUserName ? `<p><strong>Data dipindahkan kepada:</strong> ${data.transferredToUserName}</p>` : ''}
+        ${data.removalReason ? `<p><strong>Sebab:</strong> ${escapeHtml(data.removalReason)}</p>` : ''}
+        ${data.transferredToUserName ? `<p><strong>Data dipindahkan kepada:</strong> ${escapeHtml(data.transferredToUserName)}</p>` : ''}
       </div>
 
       <p>Akibat perubahan ini:</p>
@@ -1761,14 +1762,14 @@ function generateTeamMemberRemovedEmailMalay(data: TeamMemberRemovedEmailData): 
         <li>Anda tidak lagi mempunyai akses kepada resit dan data pasukan</li>
         <li>Anda tidak boleh mengemukakan tuntutan perbelanjaan baharu kepada pasukan ini</li>
         <li>Anda tidak akan menerima pemberitahuan lanjut dari pasukan ini</li>
-        ${data.transferredToUserName ? `<li>Sumbangan anda sebelum ini telah dipindahkan kepada ${data.transferredToUserName}</li>` : ''}
+        ${data.transferredToUserName ? `<li>Sumbangan anda sebelum ini telah dipindahkan kepada ${escapeHtml(data.transferredToUserName)}</li>` : ''}
       </ul>
 
       <div class="contact-info">
         <h3>Soalan atau Kebimbangan?</h3>
         <p>Jika anda mempunyai sebarang soalan mengenai penyingkiran ini atau percaya ini dilakukan secara silap, sila hubungi:</p>
-        <p><strong>${data.removedByUserName}</strong><br>
-        E-mel: <a href="mailto:${data.removedByUserEmail}">${data.removedByUserEmail}</a></p>
+        <p><strong>${escapeHtml(data.removedByUserName)}</strong><br>
+        E-mel: <a href="mailto:${escapeHtml(data.removedByUserEmail)}">${escapeHtml(data.removedByUserEmail)}</a></p>
         <p>Anda juga boleh menghubungi pasukan sokongan kami jika anda memerlukan bantuan.</p>
       </div>
 
