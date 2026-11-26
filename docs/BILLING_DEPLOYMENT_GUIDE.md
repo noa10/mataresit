@@ -28,7 +28,8 @@ This guide provides step-by-step instructions for deploying and testing the Mata
 test-mode lifecycle are verified. On 2026-11-06 the five billing SQL suites
 (`stripe_webhook_claim_fencing`, `payment_state_fencing`,
 `stripe_checkout_locks`, `profile_billing_column_protection`,
-`batch_item_dispatch_config`) passed against a disposable PostgreSQL 15
+`batch_item_dispatch_config` — since replaced by
+`batch_item_dispatch_removed`) passed against a disposable PostgreSQL 15
 database built from a curated baseline (initial schema plus the subscription
 and billing-schema migrations) and the three hardening migrations (see
 `Verification status` below). The `sql-regression` job passed on `a316a8c` and
@@ -121,7 +122,9 @@ the migration; the Edge Functions call RPCs and columns it creates.
       since it also affects other legacy keys and tokens. Replaying that
       historical migration installs the legacy `handle_new_batch_item` function
       with an invalid placeholder until the Vault-backed migration is applied.
-      It does not attach a trigger.
+      It does not attach a trigger, and
+      `20261126040000_remove_dormant_batch_dispatch.sql` removes the function
+      and its config table.
 - [ ] After any API-key rotation or revocation (legacy anon JWT or
       `sb_publishable_...`), update `VITE_SUPABASE_ANON_KEY` in **every** Vercel
       environment and redeploy. `VITE_*` values are inlined into the JS bundle
@@ -161,14 +164,13 @@ the migration; the Edge Functions call RPCs and columns it creates.
       exist recover on the next token refresh; users whose access tokens
       expired during a prolonged outage are signed out client-side and must
       sign in again.
-- [ ] Do not plan a batch-processing maintenance window for this migration.
-      No trigger in this repository or on hosted invokes
-      `handle_new_batch_item`, and the current batch upload path uses
-      `batch_upload_sessions` / `batch_upload_files` plus `process-receipt`.
-      The migration replaces an unreferenced function; it does not attach a
-      trigger. If a legacy trigger is ever reattached, the function returns
-      `NEW`, so a BEFORE attachment no longer cancels the row, and timing still
-      decides whether dispatch is enqueued before or after commit.
+- [ ] Do not plan a batch-processing maintenance window. No trigger in this
+      repository or on hosted invokes `handle_new_batch_item`, and the current
+      batch upload path uses `batch_upload_sessions` / `batch_upload_files` plus
+      `process-receipt`. `20261104000001` replaces an unreferenced function and
+      does not attach a trigger;
+      `20261126040000_remove_dormant_batch_dispatch.sql` then removes the
+      function and its config table.
 - [ ] Apply the hardening migrations, in order:
       `20261104000000_stripe_production_hardening.sql` (billing columns,
       billing-field guard, service-only billing RPCs, fenced subscription-event
@@ -179,7 +181,9 @@ the migration; the Edge Functions call RPCs and columns it creates.
       (per-user checkout ownership, fenced payment/invoice-failure/status and
       renewal-tracking RPCs, receipt usage counter RPC + trigger, lazy monthly
       usage reset). The first aborts if duplicate payment intent IDs exist; the
-      second aborts if exactly one Vault secret is not present.
+      second aborts if exactly one Vault secret is not present. Then apply
+      `20261126040000_remove_dormant_batch_dispatch.sql`, which drops the
+      legacy batch dispatch function and config table.
 - [ ] Schedule the monthly usage reset: `reset_monthly_usage()` is not
       scheduled anywhere in the application. The lazy reset inside
       `increment_receipts_used` keeps the counter correct for anyone who
@@ -190,28 +194,23 @@ the migration; the Edge Functions call RPCs and columns it creates.
       `manage-subscription` remain unfenced by design. Do not run Stripe
       dashboard mutations in parallel with a user's own plan change — on those
       unfenced paths the last write wins.
-- [ ] Leave `batch_item_dispatch_config` empty unless a trigger is deliberately
-      attached and the legacy `process-batch-item` Edge Function is reviewed.
-      The migration creates the table empty; because nothing invokes
-      `handle_new_batch_item`, the empty table does not gate current batch
-      uploads. Hosted carries an untracked, legacy `process-batch-item`
-      function whose deployment metadata is missing; do not redeploy or delete
-      it during the cutover. If the legacy trigger is reattached, have a trusted database
-      administrator configure the current environment's HTTPS endpoint. Verify
-      the hostname belongs to that environment before executing the following
-      example; never use the production hostname in a nonproduction environment:
+- [ ] Confirm the legacy batch dispatch path is gone. The path never ran:
+      nothing invoked `handle_new_batch_item`, `batch_item_dispatch_config`
+      never held a row, and no repo migration creates `batches` or
+      `batch_items`. Hosted carries an untracked, legacy `process-batch-item`
+      Edge Function with `verify_jwt: false`; it never validated the credential
+      the dispatch function sends. Delete that Edge Function as a separate authorized
+      action; do not redeploy it. Verify the removal:
 
       ```sql
-      INSERT INTO public.batch_item_dispatch_config (singleton, endpoint_url)
-      VALUES (true, 'https://YOUR_PROJECT.supabase.co/functions/v1/process-batch-item')
-      ON CONFLICT (singleton) DO UPDATE SET endpoint_url = EXCLUDED.endpoint_url;
+      select to_regclass('public.batch_item_dispatch_config') as config_table,
+             to_regprocedure('public.handle_new_batch_item()') as dispatch_function;
+      -- both must be null after 20261126040000_remove_dormant_batch_dispatch.sql
       ```
 
-      The table is owned by `postgres`, has row-level security enabled, and is
-      inaccessible to `PUBLIC`, `anon`, `authenticated`, and `service_role`.
-      Only trusted database administrators should own it or receive privileges
-      on it. Once a trigger is attached, batch inserts fail closed until it is
-      configured; an asynchronous enqueue does not prove delivery.
+      The migration leaves the Vault `service_role_key` row in place; no
+      database function reads it after the drop. Delete the row only as a
+      separate authorized action after confirming no other consumer needs it.
 - [ ] Export `payment_history` before the first migration; reconcile duplicates
       against Stripe rather than deleting them.
 - [ ] Reconcile existing subscriptions from Stripe. `billing_interval` is NULL

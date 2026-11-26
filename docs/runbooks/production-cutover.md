@@ -13,7 +13,10 @@ deployed; PR #266 remains open. The frontend was deployed before the push, and
 Edge Functions were deployed on 2026-11-25. Cache invalidation is unverified, and
 the fresh-tab and old/cached-tab billing preference smoke tests are incomplete.
 Check remote migration history and deployed function versions before deciding
-what remains to be done.
+what remains to be done. A separate cleanup,
+`20261126040000_remove_dormant_batch_dispatch.sql`, removes the dormant legacy
+batch dispatch table and function; check the remote migration history for
+whether it has been applied.
 
 ## Preconditions
 
@@ -121,45 +124,35 @@ If a future push stops on `20261104000001` because the Vault secret is missing,
 resolve the prerequisite through the authorized procedure in step 2, then rerun
 the reviewed push. Migrations already applied in the first attempt are skipped.
 
-## 4. Batch dispatch configuration (legacy path)
+## 4. Batch dispatch (legacy path removed)
 
-`20261104000001` creates `batch_item_dispatch_config` empty and replaces
-`handle_new_batch_item()`, but it **does not create a trigger**. No
-`CREATE TRIGGER` referencing `handle_new_batch_item` exists anywhere in this
-repository; the 2026-11-24 hosted observation found no non-internal trigger
-invoking it. The current
-batch upload path does not use this function: it writes
-`batch_upload_sessions` / `batch_upload_files`
-(`20250720000003_batch_upload_optimization.sql`) and posts each file to
-`process-receipt` (`src/services/receiptService.ts:1940`). No repo migration
-creates `batches` or `batch_items`.
+`20261104000001` created `batch_item_dispatch_config` and
+`handle_new_batch_item()` for a legacy `process-batch-item` Edge Function. That
+path never ran in production: no `CREATE TRIGGER` referencing the function
+exists in this repository or on hosted, the config table has never held a row,
+and no repo migration creates the `batches` or `batch_items` tables it would
+process. The current batch upload path writes `batch_upload_sessions` /
+`batch_upload_files` (`20250720000003_batch_upload_optimization.sql`) and posts
+each file to `process-receipt` (`src/services/receiptService.ts:1940`).
 
-In the 2026-11-24 hosted observation, the legacy `process-batch-item` Edge Function
-had `verify_jwt: false`, version 77, last updated 2025-04-16. It is **not tracked
-in this repository** and its deployed source could not be retrieved because its
-deployment metadata was missing. Do not redeploy or delete it during this
-cutover. At the time, no repository or hosted database invocation was found;
-verify the current state before relying on that observation.
+`20261126040000_remove_dormant_batch_dispatch.sql` drops the function and the
+table. The deployed `process-batch-item` Edge Function is an untracked orphan
+with `verify_jwt: false`; it never validated the credential the dispatch
+function sends, so it is not a usable dispatch target. Delete the Edge Function as a separate
+authorized action; do not redeploy it.
 
-If the trigger remains unattached, the empty config table does **not** block
-existing batch uploads, and leaving it empty is safe. Do not point it at a
-hostname until a trigger is
-deliberately attached and the legacy function is reviewed; an asynchronous
-`net.http_post` enqueue is not proof of delivery. If the legacy trigger is ever
-reattached, inserts fail closed with
-`Missing administrator-configured batch item endpoint` until this row is set
-(the table is owned by `postgres` and is not accessible to application roles):
+The migration leaves the Vault `service_role_key` row in place. After the drop,
+no database function reads it. Delete the row only as a separate authorized
+action after confirming no other consumer needs it; do not rotate it as part of
+this cleanup.
+
+Verify the removal:
 
 ```sql
--- only when a trigger is deliberately attached and the endpoint exists
-INSERT INTO public.batch_item_dispatch_config (singleton, endpoint_url)
-VALUES (true, 'https://<environment-ref>.supabase.co/functions/v1/process-batch-item')
-ON CONFLICT (singleton) DO UPDATE SET endpoint_url = EXCLUDED.endpoint_url;
-```
+select to_regclass('public.batch_item_dispatch_config') as config_table,
+       to_regprocedure('public.handle_new_batch_item()') as dispatch_function;
+-- expected: both null
 
-Verify the current (unattached) state:
-
-```sql
 select n.nspname as schema, c.relname as table_name, t.tgname
 from pg_trigger t
 join pg_class c on c.oid = t.tgrelid
@@ -181,12 +174,13 @@ select column_name from information_schema.columns
 select to_regclass('public.stripe_checkout_locks'),
        to_regclass('public.stripe_webhook_events'),
        to_regclass('public.stripe_subscription_event_order');
-select endpoint_url from public.batch_item_dispatch_config; -- zero rows expected; see step 4
+select to_regclass('public.batch_item_dispatch_config'),
+       to_regprocedure('public.handle_new_batch_item()'); -- both null; see step 4
 ```
 
-Confirm no trigger is attached (the query in step 4 must return zero rows).
-`batch_item_dispatch` is not a table in this project; the only table is
-`batch_item_dispatch_config`, and it is deliberately empty after the migration.
+Confirm the legacy dispatch function and table are gone (the queries in step 4
+must return null and zero rows). The deployed `process-batch-item` Edge Function
+is a separate untracked orphan; its deletion is an authorized operator action.
 
 Smoke test with a test-mode event (never a live charge): send one
 `customer.subscription.updated` event to the deployed `stripe-webhook` and

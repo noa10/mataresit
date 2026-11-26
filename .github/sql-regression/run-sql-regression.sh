@@ -36,7 +36,7 @@ suite_list=(
   stripe_fencing_regressions
   profile_billing_column_protection
   billing_schema_restore
-  batch_item_dispatch_config
+  batch_item_dispatch_removed
   billing_rpc_grants
   billing_preferences_rpc_revoke
   renewal_tracking_overload
@@ -59,6 +59,7 @@ curated_migrations=(
   20261126010000_restore_profile_billing_columns.sql
   20261126020000_revoke_legacy_billing_preferences_rpc.sql
   20261126030000_drop_redundant_renewal_tracking_overload.sql
+  20261126040000_remove_dormant_batch_dispatch.sql
 )
 
 mkdir -p "$log_dir"
