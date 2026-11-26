@@ -4976,62 +4976,6 @@ $$;
 ALTER FUNCTION "public"."get_users_by_ids"("user_ids" "uuid"[]) OWNER TO "postgres";
 
 
-CREATE TABLE "public"."batch_item_dispatch_config" (
-    "singleton" boolean DEFAULT true NOT NULL PRIMARY KEY CHECK ("singleton"),
-    "endpoint_url" text NOT NULL CHECK ("endpoint_url" ~ '^https://[A-Za-z0-9.-]+(:[0-9]+)?/functions/v1/process-batch-item$')
-);
-
-ALTER TABLE "public"."batch_item_dispatch_config" OWNER TO "postgres";
-ALTER TABLE "public"."batch_item_dispatch_config" ENABLE ROW LEVEL SECURITY;
-REVOKE ALL ON TABLE "public"."batch_item_dispatch_config" FROM PUBLIC, "anon", "authenticated", "service_role";
-
-
-CREATE OR REPLACE FUNCTION "public"."handle_new_batch_item"() RETURNS "trigger"
-    LANGUAGE "plpgsql"
-    SECURITY DEFINER
-    SET "search_path" TO 'pg_catalog'
-    AS $$
-DECLARE
-  v_service_key TEXT;
-  v_batch_url TEXT;
-BEGIN
-  -- The service-role key lives in Supabase Vault as `service_role_key`.
-  SELECT decrypted_secret
-  INTO v_service_key
-  FROM vault.decrypted_secrets
-  WHERE name = 'service_role_key'
-  LIMIT 1;
-
-  IF v_service_key IS NULL THEN
-    RAISE EXCEPTION 'Missing Vault secret service_role_key';
-  END IF;
-
-  SELECT endpoint_url INTO v_batch_url
-  FROM public.batch_item_dispatch_config
-  WHERE singleton;
-
-  IF v_batch_url IS NULL THEN
-    RAISE EXCEPTION 'Missing administrator-configured batch item endpoint';
-  END IF;
-
-  PERFORM net.http_post(
-    url := v_batch_url,
-    headers := jsonb_build_object(
-      'Content-Type', 'application/json',
-      'Authorization', 'Bearer ' || v_service_key
-    ),
-    body := jsonb_build_object('batch_item_id', NEW.id::text),
-    timeout_milliseconds := 5000
-  );
-
-  RETURN NEW;
-END;
-$$;
-
-
-ALTER FUNCTION "public"."handle_new_batch_item"() OWNER TO "postgres";
-
-
 CREATE OR REPLACE FUNCTION "public"."handle_new_user"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$
@@ -13118,10 +13062,6 @@ GRANT ALL ON FUNCTION "public"."hamming_distance"(bit, bit) TO "postgres";
 GRANT ALL ON FUNCTION "public"."hamming_distance"(bit, bit) TO "anon";
 GRANT ALL ON FUNCTION "public"."hamming_distance"(bit, bit) TO "authenticated";
 GRANT ALL ON FUNCTION "public"."hamming_distance"(bit, bit) TO "service_role";
-
-
-
-REVOKE ALL ON FUNCTION "public"."handle_new_batch_item"() FROM PUBLIC, "anon", "authenticated", "service_role";
 
 
 

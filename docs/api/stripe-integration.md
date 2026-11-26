@@ -64,16 +64,17 @@ supabase secrets set \
   STRIPE_MAX_ANNUAL_PRICE_ID=price_...
 ```
 
-The `handle_new_batch_item()` trigger function reads the service-role key from
-Supabase Vault. No trigger was attached in the historical hosted observation
-(see the migration note below). The Vault credential was already replaced for
-the 2026-11-25 rollout; do not create, replace, or delete an entry as a routine
-post-push step. For an environment where `20261104000001` is still pending,
-verify exactly one lowercase `service_role_key` exists and holds the current
-service-role key; Vault names are case-sensitive, so an uppercase entry does
-not satisfy the lookup. If remediation is needed, use the authorized procedure
-in **Dashboard → Database → Vault**. Do not put the key in a migration, a
-tracked file, or the frontend environment.
+The legacy `handle_new_batch_item()` trigger function and its
+`batch_item_dispatch_config` table are removed by
+`20261126040000_remove_dormant_batch_dispatch.sql`. In the 2026-11-25 production
+observation, the function had no attached trigger and the table was empty. For
+an environment where `20261104000001` is still pending, that migration requires
+exactly one
+lowercase `service_role_key` Vault entry; Vault names are case-sensitive, so an
+uppercase entry does not satisfy the lookup. The cleanup leaves the Vault row
+in place but no database function reads it. Delete it only as a separate
+authorized action after confirming no other consumer needs it. Do not put the
+key in a migration, a tracked file, or the frontend environment.
 
 Billing Edge Functions use the injected `SUPABASE_SERVICE_ROLE_KEY`. Do not
 replace it with a new-format `sb_secret_...` key: these functions pin
@@ -112,12 +113,9 @@ hardening migrations in order:
   trigger**; no trigger in this repository invokes the function, and the
   2026-11-24 hosted observation found none attached. The current repository
   batch upload path (`batch_upload_sessions` /
-  `batch_upload_files` plus `process-receipt`) does not use it. Leave the table
-  empty unless a trigger is deliberately attached and the legacy
-  `process-batch-item` function is reviewed. The table is owned by postgres, has RLS enabled, and
-  grants no privileges to PUBLIC, anon, authenticated, or service_role. Once a
-  trigger is attached, batch-item inserts fail closed until the URL is
-  configured. The migration does not validate the endpoint before applying.
+  `batch_upload_files` plus `process-receipt`) does not use it. This migration
+  is superseded by `20261126040000_remove_dormant_batch_dispatch.sql`, which
+  drops the function and the table.
 - `supabase/migrations/20261106000000_stripe_checkout_locks_and_payment_fencing.sql`
   — adds `stripe_checkout_locks` and the checkout ownership RPCs, the
   service-only receipt-usage counter and trigger, and the fenced
@@ -132,11 +130,14 @@ interval prevents the UI from reporting annual subscriptions correctly.
 
 The five billing SQL suites in `supabase/tests/` (`stripe_webhook_claim_fencing`,
 `payment_state_fencing`, `stripe_checkout_locks`,
-`profile_billing_column_protection`, and `batch_item_dispatch_config`) were
-executed successfully on 2026-11-06 against a disposable PostgreSQL 15
-database. The runner builds it from `20231126000000_initial_schema.sql`, three
+`profile_billing_column_protection`, and `batch_item_dispatch_config`, since
+replaced by `batch_item_dispatch_removed`) were executed successfully on
+2026-11-06 against a disposable PostgreSQL 15
+database. At that time, the runner built it from
+`20231126000000_initial_schema.sql`, three
 intermediate billing migrations, a two-line `email`-column shim, and the three
-migrations above. `bootstrap.sql` substitutes the platform pieces: roles,
+migrations above. The current migration and suite lists are in the runner.
+`bootstrap.sql` substitutes the platform pieces: roles,
 `auth.uid()` / `auth.role()` shims (created only when absent), a minimal
 `auth.users` table, a `vault.decrypted_secrets` placeholder, and a `pg_net`
 stub that raises instead of delivering HTTP. The contract under test is the
@@ -461,7 +462,8 @@ The backend rules are:
 ## Security Considerations
 
 1. **API Keys**: Never expose secret keys in frontend code or tracked files.
-   The batch trigger reads the service-role key from Supabase Vault.
+   The historical batch dispatch function read its service-role key from Vault;
+   `20261126040000_remove_dormant_batch_dispatch.sql` removes that function.
 2. **Webhook Verification**: All webhooks are verified using Stripe signatures;
    the function itself has JWT verification disabled because Stripe does not
    send a Supabase JWT.
