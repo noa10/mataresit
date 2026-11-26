@@ -66,9 +66,10 @@ supabase secrets set \
 
 The legacy `handle_new_batch_item()` trigger function and its
 `batch_item_dispatch_config` table are removed by
-`20261126040000_remove_dormant_batch_dispatch.sql`. The function never had an
-attached trigger and the table never held a row. For an environment where
-`20261104000001` is still pending, that migration requires exactly one
+`20261126040000_remove_dormant_batch_dispatch.sql`. In the 2026-11-25 production
+observation, the function had no attached trigger and the table was empty. For
+an environment where `20261104000001` is still pending, that migration requires
+exactly one
 lowercase `service_role_key` Vault entry; Vault names are case-sensitive, so an
 uppercase entry does not satisfy the lookup. The cleanup leaves the Vault row
 in place but no database function reads it. Delete it only as a separate
@@ -132,9 +133,11 @@ The five billing SQL suites in `supabase/tests/` (`stripe_webhook_claim_fencing`
 `profile_billing_column_protection`, and `batch_item_dispatch_config`, since
 replaced by `batch_item_dispatch_removed`) were executed successfully on
 2026-11-06 against a disposable PostgreSQL 15
-database. The runner builds it from `20231126000000_initial_schema.sql`, three
+database. At that time, the runner built it from
+`20231126000000_initial_schema.sql`, three
 intermediate billing migrations, a two-line `email`-column shim, and the three
-migrations above. `bootstrap.sql` substitutes the platform pieces: roles,
+migrations above. The current migration and suite lists are in the runner.
+`bootstrap.sql` substitutes the platform pieces: roles,
 `auth.uid()` / `auth.role()` shims (created only when absent), a minimal
 `auth.users` table, a `vault.decrypted_secrets` placeholder, and a `pg_net`
 stub that raises instead of delivering HTTP. The contract under test is the
@@ -459,7 +462,8 @@ The backend rules are:
 ## Security Considerations
 
 1. **API Keys**: Never expose secret keys in frontend code or tracked files.
-   The batch trigger reads the service-role key from Supabase Vault.
+   The historical batch dispatch function read its service-role key from Vault;
+   `20261126040000_remove_dormant_batch_dispatch.sql` removes that function.
 2. **Webhook Verification**: All webhooks are verified using Stripe signatures;
    the function itself has JWT verification disabled because Stripe does not
    send a Supabase JWT.

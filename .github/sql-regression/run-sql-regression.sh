@@ -208,7 +208,43 @@ SQL
       # restore runs; the protection suite proves it is gone afterwards.
       run_file "reproduce profile billing drift" "${scripts_dir}/profile-billing-drift-reproduction.sql"
     fi
+    if [[ "$migration" == "20261126040000_remove_dormant_batch_dispatch.sql" ]]; then
+      # Exercise the real migration against an untracked trigger dependency on
+      # the disposable database only. Its failure must roll back every change.
+      psql_exec <<'SQL'
+INSERT INTO public.batch_item_dispatch_config (endpoint_url)
+VALUES ('https://example.invalid/functions/v1/process-batch-item');
+CREATE TABLE public.batch_dispatch_dependency_fixture (id integer);
+CREATE TRIGGER batch_dispatch_dependency_fixture_trigger
+  BEFORE INSERT ON public.batch_dispatch_dependency_fixture
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_batch_item();
+SQL
+      batch_state_sql="SELECT concat_ws('|', to_regprocedure('public.handle_new_batch_item()')::oid, to_regclass('public.batch_item_dispatch_config')::oid, (SELECT oid FROM pg_trigger WHERE tgrelid = 'public.batch_dispatch_dependency_fixture'::regclass AND tgname = 'batch_dispatch_dependency_fixture_trigger' AND NOT tgisinternal), (SELECT endpoint_url FROM public.batch_item_dispatch_config WHERE singleton))"
+      original_batch_state="$(psql_exec -tAc "$batch_state_sql")"
+      if psql_exec -f - < "${migrations_dir}/${migration}" > "${log_dir}/expected-batch-dependency-error.log" 2>&1; then
+        printf 'Expected batch dispatch migration to reject an attached trigger\n' >&2
+        exit 1
+      fi
+      if ! grep -Fq 'cannot drop function handle_new_batch_item() because other objects depend on it' "${log_dir}/expected-batch-dependency-error.log" || \
+         ! grep -Fq 'batch_dispatch_dependency_fixture_trigger' "${log_dir}/expected-batch-dependency-error.log"; then
+        printf 'Batch dispatch migration failed without the expected trigger dependency error\n' >&2
+        exit 1
+      fi
+      if [[ "$(psql_exec -tAc "$batch_state_sql")" != "$original_batch_state" ]]; then
+        printf 'Rejected migration changed batch dispatch objects or fixture data\n' >&2
+        exit 1
+      fi
+      psql_exec <<'SQL'
+DROP TRIGGER batch_dispatch_dependency_fixture_trigger ON public.batch_dispatch_dependency_fixture;
+DROP TABLE public.batch_dispatch_dependency_fixture;
+SQL
+    fi
     run_file "$migration" "${migrations_dir}/${migration}"
+    if [[ "$migration" == "20261126040000_remove_dormant_batch_dispatch.sql" ]]; then
+      run_file "verify batch dispatch removal" "${tests_dir}/batch_item_dispatch_removed.sql"
+      run_file "replay batch dispatch removal" "${migrations_dir}/${migration}"
+      run_file "verify replayed batch dispatch removal" "${tests_dir}/batch_item_dispatch_removed.sql"
+    fi
     if [[ "$migration" == "20261126010000_restore_profile_billing_columns.sql" ]]; then
       # Idempotency: the migration is a no-op on the fresh/enum shape and must
       # not replace the enum or the existing defaults when replayed.

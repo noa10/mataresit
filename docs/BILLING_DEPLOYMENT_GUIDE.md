@@ -61,17 +61,19 @@ Local SQL execution (2026-11-06):
 bash .github/sql-regression/run-sql-regression.sh
 ```
 
-The tracked runner creates a loopback-only `postgres:15-alpine` container,
-applies a curated production-shaped baseline plus
+At that time, the runner created a loopback-only `postgres:15-alpine` container,
+applied a curated production-shaped baseline plus
 `20261104000000_stripe_production_hardening.sql`,
 `20261104000001_batch_item_vault_trigger.sql`, and
-`20261106000000_stripe_checkout_locks_and_payment_fencing.sql`, then runs the
-five suites. All five exited 0. It then runs
+`20261106000000_stripe_checkout_locks_and_payment_fencing.sql`, then ran the
+five suites. All five exited 0. It also ran
 `.github/sql-regression/two-session-races.sh` against the same target: two real
 connections race lock acquisition and webhook claims, and the harness asserts
 one owner, one claim, owner-scoped bind/release, stale-token rejection, and
 expired-lock stealing. Both the suites and the race harness passed on
 2026-11-06 and run in the `sql-regression` CI job, which passed on `a316a8c`.
+For the current curated migrations and suites, see
+`.github/sql-regression/run-sql-regression.sh`.
 The full historical migration chain is **not** replayed: it contains remote
 placeholders and out-of-band schema drift, so it is not a valid bootstrap.
 
@@ -97,9 +99,12 @@ and runs the same runner. It passed on `a316a8c` (job 127860977562) and on
 Complete these steps in order before switching to live Stripe keys. Do not skip
 the migration; the Edge Functions call RPCs and columns it creates.
 
-- [ ] Create the Vault secret named `service_role_key` (Dashboard → Database →
-      Vault). Never commit or log its value. Check that exactly one entry exists.
-      Treat any previously exposed credential as compromised; redacting the
+- [ ] Check migration state. If `20261104000001` is pending, verify that exactly
+      one lowercase Vault secret named `service_role_key` exists; use the
+      authorized Dashboard → Database → Vault procedure only if remediation is
+      needed. Never commit or log its value. The later cleanup migration does
+      not require creating a secret. Treat any previously exposed credential as
+      compromised; redacting the
       repository does not rotate or revoke it. Verify revocation using
       Supabase's supported process without exposing the value. The credential
       inventory as of this branch (all redacted in the working tree, all still
@@ -194,13 +199,17 @@ the migration; the Edge Functions call RPCs and columns it creates.
       `manage-subscription` remain unfenced by design. Do not run Stripe
       dashboard mutations in parallel with a user's own plan change — on those
       unfenced paths the last write wins.
-- [ ] Confirm the legacy batch dispatch path is gone. The path never ran:
-      nothing invoked `handle_new_batch_item`, `batch_item_dispatch_config`
-      never held a row, and no repo migration creates `batches` or
-      `batch_items`. Hosted carries an untracked, legacy `process-batch-item`
-      Edge Function with `verify_jwt: false`; it never validated the credential
-      the dispatch function sends. Delete that Edge Function as a separate authorized
-      action; do not redeploy it. Verify the removal:
+- [ ] Confirm the legacy batch dispatch path is gone. On 2026-11-25, production
+      had no trigger invoking `handle_new_batch_item`, and
+      `batch_item_dispatch_config` was empty. Production lacked `batches` and
+      `batch_items`, and no repo migration creates them. The observed production
+      project carries an untracked, legacy `process-batch-item` Edge Function
+      with `verify_jwt: false`. The
+      migration does not remove or secure it. Delete it as a separate authorized
+      action and confirm its absence before closing the follow-up card; do not
+      redeploy it. In other environments, inventory the function and its
+      consumers independently before deciding whether to remove it. Verify the
+      database removal:
 
       ```sql
       select to_regclass('public.batch_item_dispatch_config') as config_table,

@@ -128,21 +128,25 @@ the reviewed push. Migrations already applied in the first attempt are skipped.
 
 `20261104000001` created `batch_item_dispatch_config` and
 `handle_new_batch_item()` for a legacy `process-batch-item` Edge Function. That
-path never ran in production: no `CREATE TRIGGER` referencing the function
-exists in this repository or on hosted, the config table has never held a row,
-and no repo migration creates the `batches` or `batch_items` tables it would
-process. The current batch upload path writes `batch_upload_sessions` /
+path was dormant in the 2026-11-25 production observation: no `CREATE TRIGGER`
+referencing the function exists in this repository, no trigger was attached on
+hosted, and the config table was empty. The `batches` and `batch_items` tables it
+would process were absent from production and no repo migration creates them.
+The current batch upload path writes `batch_upload_sessions` /
 `batch_upload_files` (`20250720000003_batch_upload_optimization.sql`) and posts
 each file to `process-receipt` (`src/services/receiptService.ts:1940`).
 
 `20261126040000_remove_dormant_batch_dispatch.sql` drops the function and the
-table. The deployed `process-batch-item` Edge Function is an untracked orphan
-with `verify_jwt: false`; it never validated the credential the dispatch
-function sends, so it is not a usable dispatch target. Delete the Edge Function as a separate
-authorized action; do not redeploy it.
+table. In the observed production project, the deployed `process-batch-item`
+Edge Function is an untracked orphan with `verify_jwt: false`. The migration does
+not remove or secure this endpoint. Delete the Edge Function as a separate
+authorized action and confirm its absence before closing the follow-up card; do
+not redeploy it. Inventory other environments and their consumers independently
+before deciding whether to remove their functions.
 
-The migration leaves the Vault `service_role_key` row in place. After the drop,
-no database function reads it. Delete the row only as a separate authorized
+The migration leaves the Vault `service_role_key` row in place. In the production
+observation, the removed function was the only database function found reading it.
+Delete the row only as a separate authorized
 action after confirming no other consumer needs it; do not rotate it as part of
 this cleanup.
 
@@ -167,7 +171,9 @@ where not t.tgisinternal and p.proname = 'handle_new_batch_item';
 In the Dashboard SQL editor:
 
 ```sql
-select count(*) from vault.decrypted_secrets where name = 'service_role_key'; -- 1
+-- If 20261104000001 is pending, exactly one lowercase secret is required.
+-- After cleanup, its presence depends on the operator's separate decision.
+select count(*) from vault.decrypted_secrets where name = 'service_role_key';
 select column_name from information_schema.columns
  where table_schema='public' and table_name='profiles'
    and column_name in ('next_billing_date','payment_method_brand','payment_method_last_four','cancel_at_period_end','billing_interval');
